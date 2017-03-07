@@ -5,12 +5,38 @@ GAlaxy Tools for Obsids and RTS
 ## Motivation
 Downloading obsids for the MWA can be a tedious, time-consuming task. The root of this problem lies with having the majority of data stored on tapes for long-term storage. `gator` aims to lessen the cognitive load required to download and process large amounts of data.
 
-These scripts probably mean little to anyone not using the galaxy supercomputer, but they could be modified. I am, however, more interested in keeping things simple, and supporting only galaxy for the moment.
+These scripts probably mean little to anyone not using the galaxy supercomputer, but they could be modified. I am, however, more interested in keeping things simple, and thus only supporting galaxy for the moment.
 
 
 ## Requirements
 ### Software
-+ `Ruby` - the version on galaxy (`/usr/bin/ruby`) should work fine.
++ `Ruby`
+  + Unfortunately, galaxy does not (appear) to provide `gem` (the `ruby` package installer). Therefore, you need to install it yourself.
+  + Download the latest copy [here](https://www.ruby-lang.org/en/downloads/).
+  + Extract it, and customise the following to your needs (in particular where it will be installed according to PREFIX):
+
+        #!/bin/bash
+        
+        PREFIX=/group/mwaeor/cjordan/Software
+        PATH=$PREFIX/usr/bin:$PATH
+        LD_LIBRARY_PATH=$PREFIX/usr/lib:$LD_LIBRARY_PATH
+        
+        ./configure \
+               --prefix=$PREFIX/usr \
+               --sysconfdir=$PREFIX/etc \
+               --localstatedir=$PREFIX/var \
+               --sharedstatedir=$PREFIX/var/lib \
+               --libexecdir=$PREFIX/usr/lib/ruby \
+               --enable-shared \
+               --disable-rpath \
+               --with-dbm-type=gdbm_compat
+
+        make
+        make install
+        
+  + Add the specified PREFIX above to your path, before the `/usr/bin` entry to circumvent the system `ruby`.
+    + e.g. `PATH=$PREFIX:$PATH` would suffice.
+  + Run `gem i sqlite3` to install the required gem.
 
 ### Environment variables
 + `MWA_DIR` - the directory in which data is download. For EoR, this should be `/scratch2/mwaeor/MWA`. Obsids are actually contained in `$MWA_DIR/data/`.
