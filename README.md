@@ -14,26 +14,28 @@ These scripts probably mean little to anyone not using the galaxy supercomputer,
   + Unfortunately, galaxy does not (appear) to provide `gem` (the `ruby` package installer). Therefore, you need to install it yourself.
   + Download the latest copy [here](https://www.ruby-lang.org/en/downloads/).
   + Extract it, and customise the following to your needs (in particular where it will be installed according to PREFIX):
+  
+    ```
+    #!/bin/bash
+    
+    PREFIX=/group/mwaeor/cjordan/Software
+    PATH=$PREFIX/usr/bin:$PATH
+    LD_LIBRARY_PATH=$PREFIX/usr/lib:$LD_LIBRARY_PATH
+    
+    ./configure \
+           --prefix=$PREFIX/usr \
+           --sysconfdir=$PREFIX/etc \
+           --localstatedir=$PREFIX/var \
+           --sharedstatedir=$PREFIX/var/lib \
+           --libexecdir=$PREFIX/usr/lib/ruby \
+           --enable-shared \
+           --disable-rpath \
+           --with-dbm-type=gdbm_compat
+    
+    make
+    make install
+    ```
 
-        #!/bin/bash
-        
-        PREFIX=/group/mwaeor/cjordan/Software
-        PATH=$PREFIX/usr/bin:$PATH
-        LD_LIBRARY_PATH=$PREFIX/usr/lib:$LD_LIBRARY_PATH
-        
-        ./configure \
-               --prefix=$PREFIX/usr \
-               --sysconfdir=$PREFIX/etc \
-               --localstatedir=$PREFIX/var \
-               --sharedstatedir=$PREFIX/var/lib \
-               --libexecdir=$PREFIX/usr/lib/ruby \
-               --enable-shared \
-               --disable-rpath \
-               --with-dbm-type=gdbm_compat
-
-        make
-        make install
-        
   + Add the specified PREFIX above to your path, before the `/usr/bin` entry to circumvent the system `ruby`.
     + e.g. `PATH=$PREFIX:$PATH` would suffice.
   + Run `gem i sqlite3` to install the required gem.
