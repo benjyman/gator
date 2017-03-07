@@ -1,0 +1,18 @@
+#!/usr/bin/env ruby
+
+# This script is intended to run the RTS for every obsid specified.
+# It assumes that the data for each obsid has already been downloaded.
+
+$LOAD_PATH.unshift "#{File.dirname(__FILE__)}/.."
+require "gator"
+
+
+if __FILE__ == $0
+    abort "No obsids supplied!" if ARGV.length == 0
+
+    obtain_obsids(ARGV).each do |o|
+        puts setup_jobid = rts_setup(o)
+        puts patch_jobid = rts_patch(o, setup_jobid)
+        puts rts_peel(o, patch_jobid)
+    end
+end
