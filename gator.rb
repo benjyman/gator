@@ -56,7 +56,7 @@ obsdownload.py -o #{obsid} -m
 "
 
     File.open("#{obsid}.sh", 'w') { |f| f.puts contents }
-    # `sbatch #{obsid}.sh`.match(/Submitted batch job (\d+)/)[1].to_i
+    `sbatch #{obsid}.sh`.match(/Submitted batch job (\d+)/)[1].to_i
 end
 
 def rts_setup(obsid, mins=5)

@@ -12,8 +12,8 @@ OptionParser.new do |opts|
     $database = "#{ENV["MYGROUP"]}/obsids.sqlite"
 	opts.on("-d", "--database DATABASE", "Specify the database to be used. Default: #{$database}") {|o| $database = o}
 
-    retry_time = 3600
-	opts.on("-r", "--retry_time TIME", "If an obsid download job failed, wait this long before retrying (seconds). Default: #{retry_time}") {|o| retry_time = o}
+    $retry_time = 3600
+	opts.on("-r", "--retry_time TIME", "If an obsid download job failed, wait this long before retrying (seconds). Default: #{$retry_time}") {|o| $retry_time = o}
 end.parse!
 
 abort("$MWA_DIR not defined.") unless ENV["MWA_DIR"]
@@ -26,15 +26,18 @@ table_name = "downloads"
 max_queue_length = 30
 
 
+abort("Database (#{$database}) doesn't exist!") unless File.exists?($database)
+db = SQLite3::Database.open $database
+db.results_as_hash = true
+
 begin
     # Loop forever, until all obsids have been downloaded.
     loop do
-        _, jobs_in_queue, len_queue = get_queue("zeus", "cjordan")
+        _, jobs_in_queue, len_queue = get_queue("zeus", ENV["USER"])
 
         db.execute("select * from #{table_name}") do |r|
             obsid = r["Obsid"]
             status = r["Status"]
-            submitted = false
 
             # If this obsid has been downloaded or is queued, advance.
             if status == "downloaded"
@@ -64,16 +67,16 @@ begin
             break if len_queue >= max_queue_length
 
             # If the failed obsid has been waiting for long enough, try downloading again.
-            if status == "failed" and (Time.now - Time.parse(r["LastChecked"])) > retry_time
+            if status == "failed" and (Time.now - Time.parse(r["LastChecked"])) > $retry_time
                 jobid = download(obsid, 10)
-                submitted = true
+                puts "Submitted #{obsid} as job #{jobid}"
+                db.execute("UPDATE #{table_name} SET Status = 'downloading' WHERE Obsid = #{obsid}")
+                db.execute("UPDATE #{table_name} SET JobID = #{jobid} WHERE Obsid = #{obsid}")
+                db.execute("UPDATE #{table_name} SET LastChecked = '#{Time.now}' WHERE Obsid = #{obsid}")
+                len_queue += 1
             # Untouched obsid - download it.
             elsif status == "unqueued"
                 jobid = download(obsid, 3)
-                submitted = true
-            end
-
-            if submitted
                 puts "Submitted #{obsid} as job #{jobid}"
                 db.execute("UPDATE #{table_name} SET Status = 'downloading' WHERE Obsid = #{obsid}")
                 db.execute("UPDATE #{table_name} SET JobID = #{jobid} WHERE Obsid = #{obsid}")
@@ -84,7 +87,7 @@ begin
 
         # Check the status of all obsids - have they all been downloaded? If so, exit.
         num_downloaded = db.execute("select * from #{table_name} where Status = 'downloaded'").length
-        num_obsids = obsids_in_table.length
+        num_obsids = db.execute("select * from #{table_name}").length
         if num_downloaded == num_obsids
             puts "\nJobs done."
             exit 

@@ -40,5 +40,5 @@ obtain_obsids(ARGV).each do |o|
 
     obsids_in_table.push o
     puts "Added: #{o}"
-    db.execute "INSERT INTO #{table_name} VALUES(#{to_be_inserted}, 0, 'unqueued', '#{Time.now}', 0, ' ')"
+    db.execute "INSERT INTO #{table_name} VALUES(#{o.to_i}, 0, 'unqueued', '#{Time.now}', 0, ' ')"
 end
