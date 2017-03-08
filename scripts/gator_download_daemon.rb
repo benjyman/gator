@@ -46,9 +46,9 @@ begin
             elsif status == "downloading"
                 jobid = r["JobID"]
                 unless jobs_in_queue.include? jobid
-                    stdout = File.readlines("getNGASdata-#{obsid}-#{jobid}.out").last
+                    stdout = File.read("getNGASdata-#{obsid}-#{jobid}.out")
                     # If the download was successful...
-                    if stdout =~ /File Transfer Success./
+                    if stdout.scan(/File Transfer Success/).count == 3
                         # ... update the table to say so.
                         db.execute("UPDATE #{table_name} SET Status = 'downloaded' WHERE Obsid = #{obsid}")
                     # If the download was not successful...
@@ -57,14 +57,20 @@ begin
                         db.execute("UPDATE #{table_name} SET Status = 'failed' WHERE Obsid = #{obsid}")
                     end
 
-                    db.execute("UPDATE #{table_name} SET Stdout = '#{stdout}' WHERE Obsid = #{obsid}")
+                    last_line = stdout.split("\n").last
+                    db.execute("UPDATE #{table_name} SET Stdout = '#{last_line}' WHERE Obsid = #{obsid}")
                     db.execute("UPDATE #{table_name} SET LastChecked = '#{Time.now}' WHERE Obsid = #{obsid}")
-                    puts "#{obsid}: #{stdout}"
+                    puts "#{obsid}: #{last_line}"
                 end
             end
+        end
 
+        db.execute("select * from #{table_name}") do |r|
             # We can't do anything further if we're already at the maximum queue length.
             break if len_queue >= max_queue_length
+
+            obsid = r["Obsid"]
+            status = r["Status"]
 
             # If the failed obsid has been waiting for long enough, try downloading again.
             if status == "failed" and (Time.now - Time.parse(r["LastChecked"])) > $retry_time
