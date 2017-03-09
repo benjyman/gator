@@ -37,7 +37,7 @@ def download(obsid, mins=10)
 
     contents = "#!/bin/bash
 
-#SBATCH --job-name=dwl#{obsid}
+#SBATCH --job-name=dl_#{obsid}
 #SBATCH --output=getNGASdata-#{obsid}-%A.out
 #SBATCH --ntasks=1
 #SBATCH --ntasks-per-node=1
@@ -65,7 +65,7 @@ def rts_setup(obsid, mins=5)
     filename = "rts_setup.sh"
     contents = "#!/bin/bash
 
-#SBATCH --job-name=stp#{obsid}
+#SBATCH --job-name=se_#{obsid}
 #SBATCH --output=RTS-setup-#{obsid}-%A.out
 #SBATCH --ntasks=1
 #SBATCH --ntasks-per-node=1
@@ -84,7 +84,7 @@ aprun generate_dynamic_RTS_sourcelists.py \\
       --obslist=/scratch2/mwaeor/MWA/data/#{obsid}/obsid.dat
 
 aprun generate_mwac_qRTS_auto.py \\
-      /scratch2/mwaeor/MWA/data/#{obsid}/obsid.dat \\
+      #{ENV["MWA_DIR"]}/data/#{obsid}/obsid.dat \\
       cj 24 \\
       /group/mwaeor/bpindor/templates/EOR0_selfCalandPeel_PUMA1000_WriteUV_80khz_cotter_template.dat \\
       --auto \\
@@ -103,13 +103,19 @@ aprun reflag_mwaf_files.py \\
     `sbatch #{filename}`.match(/Submitted batch job (\d+)/)[1].to_i
 end
 
+def integration_time()
+    metafits = Dir.glob("*_metafits_ppds.fits").first
+    abort("metafits file not found!") unless metafits
+    `python -c "from astropy.io import fits; print(fits.open('#{metafits}')[0].header['INTTIME'])" 2>&1`.split.last
+end
+
 def rts_patch(obsid, dependent_jobid, mins=10)
     abort("$MWA_DIR not defined.") unless ENV["MWA_DIR"]
 
     filename = "rts_patch.sh"
     contents = "#!/bin/bash
 
-#SBATCH --job-name=pat#{obsid}
+#SBATCH --job-name=pa_#{obsid}
 #SBATCH --output=RTS-patch-#{obsid}-%A.out
 #SBATCH --nodes=25
 #SBATCH --ntasks-per-node=1
@@ -118,7 +124,7 @@ def rts_patch(obsid, dependent_jobid, mins=10)
 #SBATCH --account=mwaeor
 #SBATCH --export=NONE
 
-generate_RTS_in_mwac.py /scratch2/mwaeor/MWA/data/#{obsid} \\
+generate_RTS_in_mwac.py #{ENV["MWA_DIR"]}/data/#{obsid} \\
                         cj 24 128T \\
                         --templates=/group/mwaeor/bpindor/templates/EOR0_selfCalandPeel_PUMA1000_WriteUV_80khz_cotter_template.dat \\
                         --header=#{obsid}_metafits_ppds.fits \\
@@ -140,7 +146,7 @@ def rts_peel(obsid, dependent_jobid, mins=20)
     filename = "rts_peel.sh"
     contents = "#!/bin/bash
 
-#SBATCH --job-name=pel#{obsid}
+#SBATCH --job-name=pe_#{obsid}
 #SBATCH --output=RTS-peel-#{obsid}-%A.out
 #SBATCH --nodes=25
 #SBATCH --ntasks-per-node=1
