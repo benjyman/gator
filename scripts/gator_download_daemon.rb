@@ -12,7 +12,7 @@ OptionParser.new do |opts|
     $database = "#{ENV["MYGROUP"]}/obsids.sqlite"
 	opts.on("-d", "--database DATABASE", "Specify the database to be used. Default: #{$database}") {|o| $database = o}
 
-    $retry_time = 3600
+    $retry_time = 1800
 	opts.on("-r", "--retry_time TIME", "If an obsid download job failed, wait this long before retrying (seconds). Default: #{$retry_time}") {|o| $retry_time = o}
 end.parse!
 
@@ -72,17 +72,10 @@ begin
             obsid = r["Obsid"]
             status = r["Status"]
 
+            # If the obsid is unqueued, download it.
             # If the failed obsid has been waiting for long enough, try downloading again.
-            if status == "failed" and (Time.now - Time.parse(r["LastChecked"])) > $retry_time
-                jobid = download(obsid, 10)
-                puts "Submitted #{obsid} as job #{jobid}"
-                db.execute("UPDATE #{table_name} SET Status = 'downloading' WHERE Obsid = #{obsid}")
-                db.execute("UPDATE #{table_name} SET JobID = #{jobid} WHERE Obsid = #{obsid}")
-                db.execute("UPDATE #{table_name} SET LastChecked = '#{Time.now}' WHERE Obsid = #{obsid}")
-                len_queue += 1
-            # Untouched obsid - download it.
-            elsif status == "unqueued"
-                jobid = download(obsid, 3)
+            if status == "unqueued" or (status == "failed" and (Time.now - Time.parse(r["LastChecked"])) > $retry_time)
+                jobid = download(obsid, 5)
                 puts "Submitted #{obsid} as job #{jobid}"
                 db.execute("UPDATE #{table_name} SET Status = 'downloading' WHERE Obsid = #{obsid}")
                 db.execute("UPDATE #{table_name} SET JobID = #{jobid} WHERE Obsid = #{obsid}")
