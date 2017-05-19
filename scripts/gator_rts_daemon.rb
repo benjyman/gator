@@ -3,17 +3,33 @@
 $LOAD_PATH.unshift "#{File.dirname(__FILE__)}/.."
 require "gator"
 require "sqlite3"
+require "optparse"
 
-database = "/group/mwaeor/cjordan/rts.sqlite"
-table_name = "rts"
+OptionParser.new do |opts|
+    opts.banner = "Usage: #{__FILE__} [-d /path/to/database]\nDownload all of the obsids specified in the database."
+    opts.on("-h", "--help", "Display this message.") {puts opts; exit}
+
+    $database = "#{ENV["MYGROUP"]}/rts.sqlite"
+	opts.on("-d", "--database DATABASE", "Specify the database to be used. Default: #{$database}") {|o| $database = o}
+
+    $retry_time = 1800
+	opts.on("-r", "--retry_time TIME", "If an obsid download job failed, wait this long before retrying (seconds). Default: #{$retry_time}") {|o| $retry_time = o}
+end.parse!
+
+abort("$MWA_DIR not defined.") unless ENV["MWA_DIR"]
+abort("$MYGROUP not defined.") unless ENV["MYGROUP"]
+abort("$USER not defined.") unless ENV["USER"]
+
+
+table_name = "downloads"
 max_queue_length = 30
 
 
 begin
-    if File.exists?(database)
-        db = SQLite3::Database.open database
+    if File.exists?($database)
+        db = SQLite3::Database.open $database
     else
-        db = SQLite3::Database.new database
+        db = SQLite3::Database.new $database
         db.execute "CREATE TABLE #{table_name}(Obsid INTEGER PRIMARY KEY, Status TEXT, LastChecked TEXT, SetupJobID INTEGER, PatchJobID INTEGER, PeelJobID INTEGER, Stdout TEXT)"
     end
     db.results_as_hash = true
@@ -47,10 +63,12 @@ begin
             elsif jobs_in_queue.include? r["PeelJobID"]
                 status = "peeling"
                 status_update = true
-            elsif not jobs_in_queue.include? r["PeelJobID"] and status == "peeling"
-                # For now, always assume the peel was successful.
-                status = "peeled"
-                status_update = true
+            elsif not jobs_in_queue.include? r["PeelJobID"]
+                if status == "patching" or status == "peeling"
+                    status, final = rts_status(obsid)
+                    status_update = true
+                    db.execute("UPDATE #{table_name} SET Stdout = '#{final}' WHERE Obsid = #{obsid}")
+                end
             end
 
             if status_update
@@ -61,11 +79,15 @@ begin
             # We can't do anything further if we're already at the maximum queue length.
             break if len_queue >= max_queue_length
 
-            if status == "unqueued"
+            if status == "patched" and not jobs_in_queue.include? r["PeelJobID"]
+                peel_jobid = rts_peel(obsid, 1)
+                db.execute("UPDATE #{table_name} SET PeelJobID = #{peel_jobid} WHERE Obsid = #{obsid}")
+            elsif status == "unqueued"
                 setup_jobid = rts_setup(obsid)
                 patch_jobid = rts_patch(obsid, setup_jobid)
                 peel_jobid = rts_peel(obsid, patch_jobid)
                 puts "Submitted #{obsid} as jobs #{setup_jobid}, #{patch_jobid}, #{peel_jobid}."
+                db.execute("UPDATE #{table_name} SET Status = 'setting up' WHERE Obsid = #{obsid}")
                 db.execute("UPDATE #{table_name} SET SetupJobID = #{setup_jobid} WHERE Obsid = #{obsid}")
                 db.execute("UPDATE #{table_name} SET PatchJobID = #{patch_jobid} WHERE Obsid = #{obsid}")
                 db.execute("UPDATE #{table_name} SET PeelJobID = #{peel_jobid} WHERE Obsid = #{obsid}")
@@ -74,14 +96,17 @@ begin
             end
         end
 
-        # Check the status of all obsids - have they all been downloaded? If so, exit.
-        num_downloaded = db.execute("select * from #{table_name} where Status = 'peeled'").length
-        num_obsids = obsids_in_table.length
-        if num_downloaded == num_obsids
+        # # Check the status of all obsids - have they all been peeled? If so, exit.
+        # num_peeled = db.execute("select * from #{table_name} where not Status = 'peeled'").length
+        num_peeled = db.execute("select * from #{table_name} where Status = 'unqueued'").length
+        # num_obsids = obsids_in_table.length
+        # if num_peeled == num_obsids
+        if num_peeled == 0
             puts "\nJobs done."
             exit 
         else
-            puts "Number of obsids not yet processed: #{num_obsids - num_downloaded}"
+            # puts "Number of obsids not yet processed: #{num_obsids - num_peeled}"
+            puts "Number of obsids not yet processed: #{num_peeled}"
         end
 
         puts "Sleeping...\n\n"

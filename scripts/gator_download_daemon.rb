@@ -46,9 +46,9 @@ begin
             elsif status == "downloading"
                 jobid = r["JobID"]
                 unless jobs_in_queue.include? jobid
-                    stdout = File.read("getNGASdata-#{obsid}-#{jobid}.out")
+                    stdout = File.read("#{ENV["MWA_DIR"].chomp('/')}/data/#{obsid}/getNGASdata-#{obsid}-#{jobid}.out")
                     # If the download was successful...
-                    if stdout.scan(/File Transfer Success/).count == 3
+                    if stdout.scan(/File Transfer Success/).count == 1
                         # ... update the table to say so.
                         db.execute("UPDATE #{table_name} SET Status = 'downloaded' WHERE Obsid = #{obsid}")
                     # If the download was not successful...
@@ -75,7 +75,7 @@ begin
             # If the obsid is unqueued, download it.
             # If the failed obsid has been waiting for long enough, try downloading again.
             if status == "unqueued" or (status == "failed" and (Time.now - Time.parse(r["LastChecked"])) > $retry_time)
-                jobid = download(obsid, 5)
+                jobid = download(obsid, mins: 5)
                 puts "Submitted #{obsid} as job #{jobid}"
                 db.execute("UPDATE #{table_name} SET Status = 'downloading' WHERE Obsid = #{obsid}")
                 db.execute("UPDATE #{table_name} SET JobID = #{jobid} WHERE Obsid = #{obsid}")
@@ -85,13 +85,12 @@ begin
         end
 
         # Check the status of all obsids - have they all been downloaded? If so, exit.
-        num_downloaded = db.execute("select * from #{table_name} where Status = 'downloaded'").length
-        num_obsids = db.execute("select * from #{table_name}").length
-        if num_downloaded == num_obsids
+        num_not_downloaded = db.execute("select * from #{table_name} where not Status = 'downloaded'").length
+        if num_not_downloaded == 0
             puts "\nJobs done."
             exit 
         else
-            puts "Number of obsids not yet downloaded: #{num_obsids - num_downloaded}"
+            puts "Number of obsids not yet downloaded: #{num_not_downloaded}"
         end
 
         puts "Sleeping...\n\n"

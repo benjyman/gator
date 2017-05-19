@@ -12,7 +12,6 @@ if __FILE__ == $0
 
     obtain_obsids(ARGV).each do |o|
         puts setup_jobid = rts_setup(o)
-        puts patch_jobid = rts_patch(o, setup_jobid)
-        puts rts_peel(o, patch_jobid)
+        puts patch_jobid = rts_patch(o, setup_jobid, mins: 40, peel: true)
     end
 end
