@@ -11,7 +11,8 @@ if __FILE__ == $0
     abort "No obsids supplied!" if ARGV.length == 0
 
     obtain_obsids(ARGV).each do |o|
-        puts setup_jobid = rts_setup(o)
-        puts patch_jobid = rts_patch(o, setup_jobid, mins: 40, peel: true)
+        setup_jobid, timestamp = rts_setup(o)
+        puts setup_jobid
+        puts patch_jobid = rts_patch(o, setup_jobid, timestamp, mins: 40, peel: true)
     end
 end
