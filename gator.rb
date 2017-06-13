@@ -140,10 +140,11 @@ def rts_setup(obsid, mins: 5)
         corr_dumps_per_cadence_peel = 4
         number_of_integration_bins_peel = 3
         number_of_iterations_peel = 14
-
     end
 
     source_catalogue_file = "#{$mwa_dir}/data/#{obsid}/srclist_puma-v2_complete_#{obsid}_patch1000.txt"
+    date, time = Time.now.to_s.split[0..1]
+    timestamp_dir = [date, time.split(':')[0..1].join].join('_')
 
     contents = "#!/bin/bash
 
@@ -160,12 +161,13 @@ module load pyephem
 module load setuptools
 
 list_gpubox_files.py obsid.dat
+ln -sf ../gpufiles_list.dat .
 
 generate_dynamic_RTS_sourcelists.py -n 1000 \\
                                     --sourcelist=/group/mwaeor/bpindor/PUMA/srclists/srclist_puma-v2_complete.txt \\
-                                    --obslist=#{$mwa_dir}/data/#{obsid}/obsid.dat
+                                    --obslist=#{$mwa_dir}/data/#{obsid}/#{timestamp_dir}/obsid.dat
 
-generate_mwac_qRTS_auto.py #{$mwa_dir}/data/#{obsid}/obsid.dat \\
+generate_mwac_qRTS_auto.py #{$mwa_dir}/data/#{obsid}/#{timestamp_dir}/obsid.dat \\
                            cj 24 \\
                            /group/mwaeor/bpindor/templates/EOR0_selfCalandPeel_PUMA1000_WriteUV_80khz_cotter_template.dat \\
                            --auto \\
@@ -174,7 +176,7 @@ generate_mwac_qRTS_auto.py #{$mwa_dir}/data/#{obsid}/obsid.dat \\
                            --dynamic_sourcelist=1000 \\
                            --sourcelist=/group/mwaeor/bpindor/PUMA/srclists/srclist_puma-v2_complete.txt
 
-reflag_mwaf_files.py #{$mwa_dir}/data/#{obsid}/obsid.dat 
+reflag_mwaf_files.py #{$mwa_dir}/data/#{obsid}/#{timestamp_dir}/obsid.dat
 
 generate_RTS_in_mwac.py #{$mwa_dir}/data/#{obsid} \\
                         cj 24 128T \\
@@ -182,25 +184,33 @@ generate_RTS_in_mwac.py #{$mwa_dir}/data/#{obsid} \\
                         --header=#{obsid}_metafits_ppds.fits \\
                         --channel_flags=/group/mwaeor/bpindor/templates/flagged_channels_default.txt
 
-sed -i \"s|\\(CorrDumpsPerCadence=\\).*|\\1#{corr_dumps_per_cadence_cal}|\" cj_rts_0.in
-sed -i \"s|\\(NumberOfIntegrationBins=\\).*|\\1#{number_of_integration_bins_cal}|\" cj_rts_0.in
-sed -i \"s|\\(NumberOfIterations=\\).*|\\1#{number_of_iterations_cal}|\" cj_rts_0.in
-sed -i \"s|//SourceCatalogueFile.*||; s|\\(SourceCatalogueFile=\\).*|\\1#{source_catalogue_file}|\" cj_rts_0.in
-sed -i \"s|\\(doRFIflagging=\\).*|\\11|\" cj_rts_0.in
+mv cj_rts_0.in #{ENV["USER"]}_rts_0.in
+mv cj_rts_1.in #{ENV["USER"]}_rts_1.in
 
-sed -i \"s|\\(CorrDumpsPerCadence=\\).*|\\1#{corr_dumps_per_cadence_peel}|\" cj_rts_1.in
-sed -i \"s|\\(NumberOfIntegrationBins=\\).*|\\1#{number_of_integration_bins_peel}|\" cj_rts_1.in
-sed -i \"s|\\(NumberOfIterations=\\).*|\\1#{number_of_iterations_peel}|\" cj_rts_1.in
-sed -i \"s|\\(doRFIflagging=\\).*|\\11|\" cj_rts_1.in
+sed -i \"s|\\(CorrDumpsPerCadence=\\).*|\\1#{corr_dumps_per_cadence_cal}|\" #{ENV["USER"]}_rts_0.in
+sed -i \"s|\\(NumberOfIntegrationBins=\\).*|\\1#{number_of_integration_bins_cal}|\" #{ENV["USER"]}_rts_0.in
+sed -i \"s|\\(NumberOfIterations=\\).*|\\1#{number_of_iterations_cal}|\" #{ENV["USER"]}_rts_0.in
+sed -i \"s|//SourceCatalogueFile.*||; s|\\(SourceCatalogueFile=\\).*|\\1#{source_catalogue_file}|\" #{ENV["USER"]}_rts_0.in
+sed -i \"s|\\(doRFIflagging=\\).*|\\11|\" #{ENV["USER"]}_rts_0.in
+
+sed -i \"s|\\(CorrDumpsPerCadence=\\).*|\\1#{corr_dumps_per_cadence_peel}|\" #{ENV["USER"]}_rts_1.in
+sed -i \"s|\\(NumberOfIntegrationBins=\\).*|\\1#{number_of_integration_bins_peel}|\" #{ENV["USER"]}_rts_1.in
+sed -i \"s|\\(NumberOfIterations=\\).*|\\1#{number_of_iterations_peel}|\" #{ENV["USER"]}_rts_1.in
+sed -i \"s|\\(doRFIflagging=\\).*|\\11|\" #{ENV["USER"]}_rts_1.in
 "
 
     Dir.chdir "#{$mwa_dir}/data/#{obsid}"
-    attempt_write("obsid.dat", obsid)
-    attempt_write("rts_setup.sh", contents)
-    sbatch("rts_setup.sh").match(/Submitted batch job (\d+)/)[1].to_i
+    fix_gpubox_timestamps
+    FileUtils.mkdir_p "#{$mwa_dir}/data/#{obsid}/#{timestamp_dir}"
+    Dir.chdir "#{$mwa_dir}/data/#{obsid}/#{timestamp_dir}"
+    system("ln -sf ../*metafits_ppds.fits .")
+    write("obsid.dat", obsid)
+    write("rts_setup.sh", contents)
+    jobid = sbatch("rts_setup.sh").match(/Submitted batch job (\d+)/)[1].to_i
+    return jobid, timestamp_dir
 end
 
-def rts_patch(obsid, dependent_jobid, mins: 15, peel: false, rts_path: "/group/mwaeor/CODE/RTS_alt/bin/rts_gpu")
+def rts_patch(obsid, dependent_jobid, timestamp_dir, mins: 15, peel: false, rts_path: "/group/mwaeor/CODE/RTS/bin/rts_gpu")
     filename = "rts_patch.sh"
     contents = "#!/bin/bash
 
@@ -217,7 +227,7 @@ aprun -n 25 -N 1 #{rts_path} #{ENV["USER"]}_rts_0.in
 /group/mwaeor/cjordan/Software/plot_BPcal_128T.py
 "
 
-    Dir.chdir "#{$mwa_dir}/data/#{obsid}"
+    Dir.chdir "#{$mwa_dir}/data/#{obsid}/#{timestamp_dir}"
     contents << "aprun -n 25 -N 1 #{rts_path} #{ENV["USER"]}_rts_1.in\n" if peel
 
     write(filename, contents)
@@ -232,7 +242,7 @@ def flag_tiles
     bp_output.scan(/\(flag\s+(\d+)\?\)/).flatten.uniq.join("\n")
 end
 
-def rts_peel(obsid, dependent_jobid, mins: 30, rts_path: "/group/mwaeor/CODE/RTS_alt/bin/rts_gpu")
+def rts_peel(obsid, dependent_jobid, timestamp_dir, mins: 30, rts_path: "/group/mwaeor/CODE/RTS/bin/rts_gpu")
     filename = "rts_peel.sh"
     contents = "#!/bin/bash
 
@@ -248,13 +258,13 @@ def rts_peel(obsid, dependent_jobid, mins: 30, rts_path: "/group/mwaeor/CODE/RTS
 aprun -n 25 -N 1 #{rts_path} #{ENV["USER"]}_rts_1.in
 "
 
-    Dir.chdir "#{$mwa_dir}/data/#{obsid}"
+    Dir.chdir "#{$mwa_dir}/data/#{obsid}/#{timestamp_dir}"
     write(filename, contents)
     sbatch("--dependency=afterok:#{dependent_jobid} #{filename}").match(/Submitted batch job (\d+)/)[1].to_i
 end
 
-def rts_status(obsid)
-    rts_stdout_log = Dir.glob("/scratch2/mwaeor/MWA/data/#{obsid}/RTS*.out").sort_by { |l| File.mtime(l) }.last
+def rts_status(obsid, timestamp_dir)
+    rts_stdout_log = Dir.glob("/astro/mwaeor/MWA/data/#{obsid}/#{timestamp_dir}/RTS*.out").sort_by { |l| File.mtime(l) }.last
     # If it's too big, then it failed.
     if File.stat(rts_stdout_log).size.to_f > 1000000
         status = "failed"
@@ -271,7 +281,7 @@ def rts_status(obsid)
     # Skip to the end if we already have a status.
     unless status
         # Read the latest node001.log file.
-        node001_log = Dir.glob("/scratch2/mwaeor/MWA/data/#{obsid}/*node001.log").sort_by { |l| File.mtime(l) }.last
+        node001_log = Dir.glob("/astro/mwaeor/MWA/data/#{obsid}/#{timestamp_dir}/*node001.log").sort_by { |l| File.mtime(l) }.last
         if not node001_log
             status = "???"
             final = "*** no node001 log"
