@@ -41,7 +41,7 @@ These scripts probably mean little to anyone not using the galaxy supercomputer,
   + Run `gem i sqlite3` to install the required gem.
 
 ### Environment variables
-+ `MWA_DIR` - the directory in which data is download. For EoR, this should be `/scratch2/mwaeor/MWA`. Obsids are actually contained in `$MWA_DIR/data/`.
++ `MWA_DIR` - the directory in which data is download. For EoR, this should be `/astro/mwaeor/MWA`. Obsids are actually contained in `$MWA_DIR/data/`.
 + `MYGROUP` - your personal group directory. For EoR, this should be `/group/mwaeor/$USER`.
 
 
