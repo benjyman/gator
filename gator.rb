@@ -120,6 +120,21 @@ obsdownload2.py -o #{obsid} -u
     sbatch("#{obsid}.sh").match(/Submitted batch job (\d+)/)[1].to_i
 end
 
+def fix_gpubox_timestamps
+    # Fix the "off by one" gpubox files by symlinking the offenders
+    gpubox_files = Dir.glob("*gpubox*")
+    odd = gpubox_files.select { |f| f.to_i.odd? }
+    return if odd.empty?
+    even = gpubox_files.select { |f| f.to_i.even? }
+    return if even.empty?
+
+    proper_timestamp = gpubox_files.select { |f| f.to_i.even? }.first.split('_')[1]
+    odd.each do |f|
+        a, _, *c = f.split('_')
+        system("ln -sf #{f} #{[a, proper_timestamp, c].join('_')}")
+    end
+end
+
 def rts_setup(obsid, mins: 5)
     int_time = integration_time(path: "#{$mwa_dir}/data/#{obsid}")
     # Older data
