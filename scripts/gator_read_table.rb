@@ -11,6 +11,9 @@ OptionParser.new do |opts|
     $database = "#{ENV["MYGROUP"]}/obsids.sqlite"
 	opts.on("-d", "--database DATABASE", "Specify the database to be used. By default, this is #{$database}") {|o| $database = o}
 
+    $rows = Float::INFINITY
+	opts.on("-n", "--number_of_rows NUMBER", "Specify the database rows to be printed. By default, all rows are printed.") {|o| $rows = o.to_i}
+
 	opts.on("-v", "--verbose", "List all columns of the database in the output.") {|o| options[:verbose] = o}
 end.parse!
 
@@ -22,16 +25,19 @@ begin
     db = SQLite3::Database.open $database
     db.results_as_hash = true
 
+    count = 0
     db.execute("select * from #{table_name}") do |r|
         if options[:verbose]
             puts r
         else
             puts "#{r["Obsid"]} \t #{r["Status"]} \t #{r["LastChecked"]} \t #{r["Stdout"]}"
         end
+        count += 1
+        break if count > $rows
     end
 
 rescue SQLite3::Exception => e 
-    puts "Exception occurred: #{e}"
+    puts "#{e.class}: #{e}"
 
 ensure
     db.close if db
