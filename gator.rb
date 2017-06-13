@@ -7,6 +7,7 @@ def get_queue(machine, user)
     queue = `squeue -M #{machine} -u #{user} 2>&1`
     # Sometimes the queue system needs a little time to think.
     while queue =~ /error/
+        STDERR.puts "Slurm error, waiting 10s"
         sleep 10
         queue = `squeue -M #{machine} -u #{user} 2>&1`
     end
@@ -20,6 +21,7 @@ def sbatch(command)
     output = `sbatch #{command} 2>&1`
     # Sometimes the queue system needs a little time to think.
     while output =~ /error/
+        STDERR.puts "Slurm error, waiting 10s"
         sleep 10
         output = `sbatch #{command} 2>&1`
     end
@@ -32,11 +34,12 @@ def mins2hms(mins)
     "%02d:%02d:%02d" % [t/86400*24 + t/3600%24, t/60%60, t%60]
 end
 
-def attempt_write(file, contents)
+def write(file, contents)
     begin
         File.open(file, 'w') { |f| f.puts contents }
     rescue
         STDERR.puts "Could not write to #{file} !"
+        exit 1
     end
 end
 
@@ -84,6 +87,11 @@ def alter_config(text, key, value)
     text.sub!(results.last.join(''), "#{key}=#{value}\n")
 end
 
+def rts_version(path)
+    git_dir = path.split("/bin")[0]
+    path << "\n\n" << `git --git-dir #{git_dir}/.git log "HEAD^..HEAD"`
+end
+
 def download(obsid, mins: 10)
     contents = "#!/bin/bash
 
@@ -108,7 +116,7 @@ obsdownload2.py -o #{obsid} -u
 
     FileUtils.mkdir_p "#{$mwa_dir}/data/#{obsid}"
     Dir.chdir "#{$mwa_dir}/data/#{obsid}"
-    attempt_write("#{obsid}.sh", contents)
+    write("#{obsid}.sh", contents)
     sbatch("#{obsid}.sh").match(/Submitted batch job (\d+)/)[1].to_i
 end
 
@@ -205,14 +213,15 @@ def rts_patch(obsid, dependent_jobid, mins: 15, peel: false, rts_path: "/group/m
 #SBATCH --account=mwaeor
 #SBATCH --export=NONE
 
-aprun -n 25 -N 1 #{rts_path} cj_rts_0.in
+aprun -n 25 -N 1 #{rts_path} #{ENV["USER"]}_rts_0.in
 /group/mwaeor/cjordan/Software/plot_BPcal_128T.py
 "
 
     Dir.chdir "#{$mwa_dir}/data/#{obsid}"
-    contents << "aprun -n 25 -N 1 #{rts_path} cj_rts_1.in\n" if peel
+    contents << "aprun -n 25 -N 1 #{rts_path} #{ENV["USER"]}_rts_1.in\n" if peel
 
-    attempt_write(filename, contents)
+    write(filename, contents)
+    write("rts_version_used.txt", rts_version(rts_path))
     sbatch("--dependency=afterok:#{dependent_jobid} #{filename}").match(/Submitted batch job (\d+)/)[1].to_i
 end
 
@@ -236,11 +245,11 @@ def rts_peel(obsid, dependent_jobid, mins: 30, rts_path: "/group/mwaeor/CODE/RTS
 #SBATCH --account=mwaeor
 #SBATCH --export=NONE
 
-aprun -n 25 -N 1 #{rts_path} cj_rts_1.in
+aprun -n 25 -N 1 #{rts_path} #{ENV["USER"]}_rts_1.in
 "
 
     Dir.chdir "#{$mwa_dir}/data/#{obsid}"
-    attempt_write(filename, contents)
+    write(filename, contents)
     sbatch("--dependency=afterok:#{dependent_jobid} #{filename}").match(/Submitted batch job (\d+)/)[1].to_i
 end
 
@@ -267,6 +276,7 @@ def rts_status(obsid)
             status = "???"
             final = "*** no node001 log"
         else
+            # Read the last line of the log.
             final = File.readlines(node001_log).last.strip
             if final =~ /LogDone. Closing file/
                 # Check the file size. Big enough -> peeled. Too small -> patched.
@@ -276,7 +286,6 @@ def rts_status(obsid)
                     status = "patched"
                 end
             else
-                puts obsid, final
                 status = "failed"
             end
         end
