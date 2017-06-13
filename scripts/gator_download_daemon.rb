@@ -23,7 +23,7 @@ abort("$USER not defined.") unless ENV["USER"]
 # Multiple tables can be used in the same database, but for now assume it's always the same one.
 table_name = "downloads"
 # Maximum number of jobs to have in the queue.
-max_queue_length = 30
+max_queue_length = 16
 
 
 abort("Database (#{$database}) doesn't exist!") unless File.exists?($database)
@@ -35,7 +35,7 @@ begin
     loop do
         _, jobs_in_queue, len_queue = get_queue("zeus", ENV["USER"])
 
-        db.execute("select * from #{table_name}") do |r|
+        db.execute("SELECT * FROM #{table_name}") do |r|
             obsid = r["Obsid"]
             status = r["Status"]
 
@@ -46,26 +46,35 @@ begin
             elsif status == "downloading"
                 jobid = r["JobID"]
                 unless jobs_in_queue.include? jobid
-                    stdout = File.read("#{ENV["MWA_DIR"].chomp('/')}/data/#{obsid}/getNGASdata-#{obsid}-#{jobid}.out")
-                    # If the download was successful...
-                    if stdout.scan(/File Transfer Success/).count == 1
-                        # ... update the table to say so.
-                        db.execute("UPDATE #{table_name} SET Status = 'downloaded' WHERE Obsid = #{obsid}")
-                    # If the download was not successful...
-                    else
-                        # ... label as 'failed', and a download will be tried again later.
-                        db.execute("UPDATE #{table_name} SET Status = 'failed' WHERE Obsid = #{obsid}")
-                    end
+                    begin
+                        stdout = File.read("#{ENV["MWA_DIR"].chomp('/')}/data/#{obsid}/getNGASdata-#{obsid}-#{jobid}.out")
+                        # If the download was successful...
+                        if stdout.scan(/File Transfer Success/).count == 1
+                            # ... update the table to say so.
+                            status = "downloaded"
+                        # If the download was not successful...
+                        else
+                            # ... label as 'failed', and a download will be tried again later.
+                            status = "failed"
+                        end
 
-                    last_line = stdout.split("\n").last
-                    db.execute("UPDATE #{table_name} SET Stdout = '#{last_line}' WHERE Obsid = #{obsid}")
-                    db.execute("UPDATE #{table_name} SET LastChecked = '#{Time.now}' WHERE Obsid = #{obsid}")
-                    puts "#{obsid}: #{last_line}"
+                        last_line = stdout.split("\n").last
+                        puts "#{obsid}: #{last_line}"
+                    rescue
+                        # Something went wrong - assume we failed.
+                        status = "failed"
+                        last_line = ""
+                    end
+                    db.execute("UPDATE #{table_name}
+                                SET LastChecked = '#{Time.now}',
+                                    Stdout = '#{last_line.gsub('\'', "")}',
+                                    Status = '#{status}'
+                                WHERE Obsid = #{obsid}")
                 end
             end
         end
 
-        db.execute("select * from #{table_name}") do |r|
+        db.execute("SELECT * FROM #{table_name}") do |r|
             # We can't do anything further if we're already at the maximum queue length.
             break if len_queue >= max_queue_length
 
@@ -74,18 +83,29 @@ begin
 
             # If the obsid is unqueued, download it.
             # If the failed obsid has been waiting for long enough, try downloading again.
-            if status == "unqueued" or (status == "failed" and (Time.now - Time.parse(r["LastChecked"])) > $retry_time)
-                jobid = download(obsid, mins: 5)
+            # if status == "unqueued" or (status == "failed" and (Time.now - Time.parse(r["LastChecked"])) > $retry_time)
+            if status == "unqueued"
+                jobid = download(obsid, mins: 30)
                 puts "Submitted #{obsid} as job #{jobid}"
-                db.execute("UPDATE #{table_name} SET Status = 'downloading' WHERE Obsid = #{obsid}")
-                db.execute("UPDATE #{table_name} SET JobID = #{jobid} WHERE Obsid = #{obsid}")
-                db.execute("UPDATE #{table_name} SET LastChecked = '#{Time.now}' WHERE Obsid = #{obsid}")
+                db.execute("UPDATE #{table_name}
+                            SET Status = 'downloading',
+                                JobID = #{jobid},
+                                LastChecked = '#{Time.now}'
+                            WHERE Obsid = #{obsid}")
+                len_queue += 1
+            elsif status == "failed" and (Time.now - Time.parse(r["LastChecked"])) > $retry_time
+                jobid = download(obsid, mins: 30)
+                puts "Submitted #{obsid} as job #{jobid}"
+                db.execute("UPDATE #{table_name}
+                            SET Status = 'downloading',
+                                JobID = #{jobid}
+                            WHERE Obsid = #{obsid}")
                 len_queue += 1
             end
         end
 
         # Check the status of all obsids - have they all been downloaded? If so, exit.
-        num_not_downloaded = db.execute("select * from #{table_name} where not Status = 'downloaded'").length
+        num_not_downloaded = db.execute("SELECT * FROM #{table_name} WHERE NOT Status = 'downloaded'").length
         if num_not_downloaded == 0
             puts "\nJobs done."
             exit 
@@ -98,7 +118,7 @@ begin
     end
 
 rescue SQLite3::Exception => e 
-    puts "Exception occurred: #{e}"
+    puts "#{e.class}: #{e}"
 
 ensure
     db.close if db
