@@ -19,7 +19,7 @@ db.execute("select * from #{table_name}") do |r|
 
     begin
         # Inspect the STDOUT files.
-        rts_stdout_log = Dir.glob("/scratch2/mwaeor/MWA/data/#{obsid}/RTS*.out").sort_by { |l| File.mtime(l) }.last
+        rts_stdout_log = Dir.glob("/astro/mwaeor/MWA/data/#{obsid}/RTS*.out").sort_by { |l| File.mtime(l) }.last
         # If it's too big, then it failed.
         if File.stat(rts_stdout_log).size.to_f > 1000000
             status = "failed"
@@ -36,7 +36,7 @@ db.execute("select * from #{table_name}") do |r|
         # Skip to the end if we already have a status.
         unless status
             # Read the latest node001.log file.
-            node001_log = Dir.glob("/scratch2/mwaeor/MWA/data/#{obsid}/*node001.log").sort_by { |l| File.mtime(l) }.last
+            node001_log = Dir.glob("/astro/mwaeor/MWA/data/#{obsid}/*node001.log").sort_by { |l| File.mtime(l) }.last
             final = File.readlines(node001_log).last.strip
             if final =~ /LogDone. Closing file/
                 # Check the file size. Big enough -> peeled. Too small -> patched.
