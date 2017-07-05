@@ -278,8 +278,13 @@ aprun -n 25 -N 1 #{rts_path} #{ENV["USER"]}_rts_1.in
     sbatch("--dependency=afterok:#{dependent_jobid} #{filename}").match(/Submitted batch job (\d+)/)[1].to_i
 end
 
-def rts_status(obsid, timestamp_dir)
-    rts_stdout_log = Dir.glob("/astro/mwaeor/MWA/data/#{obsid}/#{timestamp_dir}/RTS*.out").sort_by { |l| File.mtime(l) }.last
+def rts_status(obsid, timestamp_dir: nil)
+    if timestamp_dir
+        rts_stdout_log = Dir.glob("#{$mwa_dir}/data/#{obsid}/#{timestamp_dir}/RTS*.out").sort_by { |l| File.mtime(l) }.last
+    else
+        rts_stdout_log = Dir.glob("#{$mwa_dir}/data/#{obsid}/RTS*.out").sort_by { |l| File.mtime(l) }.last
+    end
+
     # If it's too big, then it failed.
     if File.stat(rts_stdout_log).size.to_f > 1000000
         status = "failed"
@@ -296,7 +301,11 @@ def rts_status(obsid, timestamp_dir)
     # Skip to the end if we already have a status.
     unless status
         # Read the latest node001.log file.
-        node001_log = Dir.glob("/astro/mwaeor/MWA/data/#{obsid}/#{timestamp_dir}/*node001.log").sort_by { |l| File.mtime(l) }.last
+        if timestamp_dir
+            node001_log = Dir.glob("#{$mwa_dir}/data/#{obsid}/#{timestamp_dir}/*node001.log").sort_by { |l| File.mtime(l) }.last
+        else
+            node001_log = Dir.glob("#{$mwa_dir}/data/#{obsid}/*node001.log").sort_by { |l| File.mtime(l) }.last
+        end
         if not node001_log
             status = "???"
             final = "*** no node001 log"
