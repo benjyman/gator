@@ -59,7 +59,7 @@ begin
             elsif jobs_in_queue.include? r["RTSJobID"] and status != "rts running"
                 new_status = "rts running"
             elsif not jobs_in_queue.include? r["RTSJobID"]
-                new_status, final = rts_status(obsid, r["Timestamp"])
+                new_status, final = rts_status(obsid, timestamp_dir: r["Timestamp"])
                 db.execute("UPDATE #{table_name} SET Stdout = '#{final}' WHERE Obsid = #{obsid}")
             end
             if new_status
