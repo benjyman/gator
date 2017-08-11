@@ -3,6 +3,13 @@ require "fileutils"
 abort("$MWA_DIR not defined.") unless ENV["MWA_DIR"]
 $mwa_dir = ENV["MWA_DIR"].chomp('/')
 
+class Float
+    def close_to?(n, tol=0.1)
+        (self - n).abs < tol
+    end
+end
+
+
 def get_queue(machine, user)
     queue = `squeue -M #{machine} -u #{user} 2>&1`
     # Sometimes the queue system needs a little time to think.
@@ -65,9 +72,36 @@ def obtain_obsids(argv)
 end
 
 def integration_time(path: '.')
-    metafits = Dir.glob("#{path}/*_metafits_ppds.fits").first
+    metafits = Dir.glob("#{path}/*metafits*").sort_by { |f| File.size(f) }.last
     abort("#{Dir.pwd}: metafits file not found!") unless metafits
-    `python -c "from astropy.io import fits; print(fits.open('#{metafits}')[0].header['INTTIME'])" 2>&1`.split.last
+    File.open(metafits, 'r') { |f| f.read(10000).match(/INTTIME \s*= \s*(\S+)/) }[1]
+end
+
+def grid_name(path: '.')
+    metafits = Dir.glob("#{path}/*metafits*").sort_by { |f| File.size(f) }.last
+    abort("#{Dir.pwd}: metafits file not found!") unless metafits
+
+    # Use the RAPHASE header tag wherever available.
+    if match = File.open(metafits, 'r') { |f| f.read(10000).match(/RAPHASE \s*= \s*(\S+)/) }
+        ra = match[1].to_f
+        if ra.close_to?(0, tol=3)
+            return "EOR0"
+        elsif ra.close_to?(60, tol=3)
+            return "EOR1"
+        else
+            return "RA=#{ra}"
+        end
+    else
+        # We have to use the RA tag instead.
+        ra = File.open(metafits, 'r') { |f| f.read(10000).match(/RA \s*= \s*(\S+)/) }[1].to_f
+        if ra.close_to?(0, tol=5) or ra.close_to?(360, tol=5)
+            return "EOR0"
+        elsif ra.close_to?(60, tol=5)
+            return "EOR1"
+        else
+            return "RA=#{ra}"
+        end
+    end
 end
 
 def alter_config(text, key, value)
@@ -141,25 +175,41 @@ def rts_setup(obsid, mins: 5)
     if int_time == "0.5"
         corr_dumps_per_cadence_cal = 128
         number_of_integration_bins_cal = 7
-        number_of_iterations_cal = 1
 
         corr_dumps_per_cadence_peel = 16
         number_of_integration_bins_peel = 5
-        number_of_iterations_peel = 14
     # Newer data
     elsif int_time == "2.0"
         corr_dumps_per_cadence_cal = 32
         number_of_integration_bins_cal = 6
-        number_of_iterations_cal = 1
 
         corr_dumps_per_cadence_peel = 4
         number_of_integration_bins_peel = 3
-        number_of_iterations_peel = 14
+    else
+        abort(sprintf "Unknown integration time! (%s for %s)", int_time, "#{$mwa_dir}/data/#{obsid}")
     end
+    number_of_iterations_cal = 1
+    number_of_iterations_peel = 14
 
-    source_catalogue_file = "#{$mwa_dir}/data/#{obsid}/srclist_puma-v2_complete_#{obsid}_patch1000.txt"
     date, time = Time.now.to_s.split[0..1]
     timestamp_dir = [date, time.split(':')[0..1].join].join('_')
+
+    grid = grid_name(path: "#{$mwa_dir}/data/#{obsid}")
+    if grid == "EOR0"
+        obs_image_centre_ra = "0."
+        obs_image_centre_dec = "-27.0"
+        source_list = "/group/mwaeor/bpindor/PUMA/srclists/srclist_puma-v2_complete.txt"
+        patch_source_catalogue_file = "#{$mwa_dir}/data/#{obsid}/srclist_puma-v2_complete_#{obsid}_patch1000.txt"
+        peel_source_catalogue_file = "/group/mwaeor/bpindor/PUMA/srclists/srclist_puma-v2_complete_1061316296_peel3000.txt"
+    elsif grid == "EOR1"
+        obs_image_centre_ra = "4.0"
+        obs_image_centre_dec = "-30.0"
+        source_list = "/group/mwaeor/bpindor/PUMA/srclists/srclist_pumaIDR4_EoR1-ext-only+ForA-shap.txt"
+        patch_source_catalogue_file = "#{$mwa_dir}/data/#{obsid}/srclist_pumaIDR4_EoR1-ext-only+ForA-shap_#{obsid}_patch1000.txt"
+        peel_source_catalogue_file = "/group/mwaeor/bpindor/PUMA/srclists/srclist_pumaIDR4_EoR1-ext-only+ForA-shap_1062364544_peel3000.txt"
+    else
+        abort(sprintf "Unknown grid name! (%s for %s)", grid, "#{$mwa_dir}/data/#{obsid}")
+    end
 
     contents = "#!/bin/bash
 
@@ -179,7 +229,7 @@ list_gpubox_files.py obsid.dat
 ln -sf ../gpufiles_list.dat .
 
 generate_dynamic_RTS_sourcelists.py -n 1000 \\
-                                    --sourcelist=/group/mwaeor/bpindor/PUMA/srclists/srclist_puma-v2_complete.txt \\
+                                    --sourcelist=#{source_list} \\
                                     --obslist=#{$mwa_dir}/data/#{obsid}/#{timestamp_dir}/obsid.dat
 
 generate_mwac_qRTS_auto.py #{$mwa_dir}/data/#{obsid}/#{timestamp_dir}/obsid.dat \\
@@ -189,7 +239,7 @@ generate_mwac_qRTS_auto.py #{$mwa_dir}/data/#{obsid}/#{timestamp_dir}/obsid.dat 
                            --chunk_number=0 \\
                            --channel_flags=/group/mwaeor/bpindor/templates/flagged_channels_default.txt \\
                            --dynamic_sourcelist=1000 \\
-                           --sourcelist=/group/mwaeor/bpindor/PUMA/srclists/srclist_puma-v2_complete.txt
+                           --sourcelist=#{source_list}
 
 reflag_mwaf_files.py #{$mwa_dir}/data/#{obsid}/#{timestamp_dir}/obsid.dat
 
@@ -205,13 +255,20 @@ mv cj_rts_1.in #{ENV["USER"]}_rts_1.in
 sed -i \"s|\\(CorrDumpsPerCadence=\\).*|\\1#{corr_dumps_per_cadence_cal}|\" #{ENV["USER"]}_rts_0.in
 sed -i \"s|\\(NumberOfIntegrationBins=\\).*|\\1#{number_of_integration_bins_cal}|\" #{ENV["USER"]}_rts_0.in
 sed -i \"s|\\(NumberOfIterations=\\).*|\\1#{number_of_iterations_cal}|\" #{ENV["USER"]}_rts_0.in
-sed -i \"s|//SourceCatalogueFile.*||; s|\\(SourceCatalogueFile=\\).*|\\1#{source_catalogue_file}|\" #{ENV["USER"]}_rts_0.in
+sed -i \"s|//SourceCatalogueFile.*||; s|\\(SourceCatalogueFile=\\).*|\\1#{patch_source_catalogue_file}|\" #{ENV["USER"]}_rts_0.in
 sed -i \"s|\\(doRFIflagging=\\).*|\\11|\" #{ENV["USER"]}_rts_0.in
+sed -i \"s|\\(ObservationImageCentreRA=\\).*|\\1#{obs_image_centre_ra}|\" #{ENV["USER"]}_rts_0.in
+sed -i \"s|\\(ObservationImageCentreDec=\\).*|\\1#{obs_image_centre_dec}|\" #{ENV["USER"]}_rts_0.in
+sed -i \"s|\\(SubBandIDs=\\).*|\\1#{(1..24).to_a.join(',')}|\" #{ENV["USER"]}_rts_0.in
 
 sed -i \"s|\\(CorrDumpsPerCadence=\\).*|\\1#{corr_dumps_per_cadence_peel}|\" #{ENV["USER"]}_rts_1.in
 sed -i \"s|\\(NumberOfIntegrationBins=\\).*|\\1#{number_of_integration_bins_peel}|\" #{ENV["USER"]}_rts_1.in
 sed -i \"s|\\(NumberOfIterations=\\).*|\\1#{number_of_iterations_peel}|\" #{ENV["USER"]}_rts_1.in
+sed -i \"s|//SourceCatalogueFile.*||; s|\\(SourceCatalogueFile=\\).*|\\1#{peel_source_catalogue_file}|\" #{ENV["USER"]}_rts_1.in
 sed -i \"s|\\(doRFIflagging=\\).*|\\11|\" #{ENV["USER"]}_rts_1.in
+sed -i \"s|\\(ObservationImageCentreRA=\\).*|\\1#{obs_image_centre_ra}|\" #{ENV["USER"]}_rts_1.in
+sed -i \"s|\\(ObservationImageCentreDec=\\).*|\\1#{obs_image_centre_dec}|\" #{ENV["USER"]}_rts_1.in
+sed -i \"s|\\(SubBandIDs=\\).*|\\1#{(1..24).to_a.join(',')}|\" #{ENV["USER"]}_rts_1.in
 "
 
     Dir.chdir "#{$mwa_dir}/data/#{obsid}"
