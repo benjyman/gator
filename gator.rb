@@ -2,6 +2,7 @@ require "fileutils"
 
 abort("$MWA_DIR not defined.") unless ENV["MWA_DIR"]
 $mwa_dir = ENV["MWA_DIR"].chomp('/')
+$project = ENV["PAWSEY_PROJECT"]
 
 class Float
     def close_to?(n, tol=0.1)
@@ -15,6 +16,7 @@ def get_queue(machine, user)
     # Sometimes the queue system needs a little time to think.
     while queue =~ /error/
         STDERR.puts "Slurm error, waiting 10s"
+        STDERR.puts "Error: #{queue}"
         sleep 10
         queue = `squeue -M #{machine} -u #{user} 2>&1`
     end
@@ -136,7 +138,7 @@ def download(obsid, mins: 10)
 #SBATCH --time=#{mins2hms(mins)}
 #SBATCH --clusters=zeus
 #SBATCH --partition=copyq
-#SBATCH --account=mwaeor
+#SBATCH --account=#{$project}
 #SBATCH --export=NONE
 
 module load pyephem
@@ -219,7 +221,7 @@ def rts_setup(obsid, mins: 5)
 #SBATCH --ntasks-per-node=1
 #SBATCH --time=#{mins2hms(mins)}
 #SBATCH --partition=gpuq
-#SBATCH --account=mwaeor
+#SBATCH --account=#{$project}
 #SBATCH --export=NONE
 
 module load pyephem
@@ -292,7 +294,7 @@ def rts_patch(obsid, dependent_jobid, timestamp_dir, mins: 15, peel: false, rts_
 #SBATCH --ntasks-per-node=1
 #SBATCH --time=#{mins2hms(mins)}
 #SBATCH --partition=gpuq
-#SBATCH --account=mwaeor
+#SBATCH --account=#{$project}
 #SBATCH --export=NONE
 
 aprun -n 25 -N 1 #{rts_path} #{ENV["USER"]}_rts_0.in
@@ -324,7 +326,7 @@ def rts_peel(obsid, dependent_jobid, timestamp_dir, mins: 30, rts_path: "/group/
 #SBATCH --ntasks-per-node=1
 #SBATCH --time=#{mins2hms(mins)}
 #SBATCH --partition=gpuq
-#SBATCH --account=mwaeor
+#SBATCH --account=#{$project}
 #SBATCH --export=NONE
 
 aprun -n 25 -N 1 #{rts_path} #{ENV["USER"]}_rts_1.in
