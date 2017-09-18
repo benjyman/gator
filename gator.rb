@@ -128,7 +128,7 @@ def rts_version(path)
     path << "\n\n" << `git --git-dir #{git_dir}/.git log "HEAD^..HEAD"`
 end
 
-def download(obsid, mins: 10)
+def download(obsid, mins: 30)
     contents = "#!/bin/bash
 
 #SBATCH --job-name=dl_#{obsid}
