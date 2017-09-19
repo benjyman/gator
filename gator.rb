@@ -136,16 +136,16 @@ def download(obsid, mins: 10)
 #SBATCH --time=#{mins2hms(mins)}
 #SBATCH --clusters=zeus
 #SBATCH --partition=copyq
-#SBATCH --account=mwaeor
+#SBATCH --account=mwasci
 #SBATCH --export=NONE
 
 module load pyephem
 module load setuptools
 cd #{$mwa_dir}/data
-# obsdownload.py -o #{obsid} --chstart=1 --chcount=24
-# obsdownload.py -o #{obsid} -f
-# obsdownload.py -o #{obsid} -m
-obsdownload2.py -o #{obsid} -u
+obsdownload.py -o #{obsid} --chstart=1 --chcount=24
+obsdownload.py -o #{obsid} -f
+obsdownload.py -o #{obsid} -m
+#obsdownload2.py -o #{obsid} -u
 "
 
     FileUtils.mkdir_p "#{$mwa_dir}/data/#{obsid}"
@@ -219,7 +219,7 @@ def rts_setup(obsid, mins: 5)
 #SBATCH --ntasks-per-node=1
 #SBATCH --time=#{mins2hms(mins)}
 #SBATCH --partition=gpuq
-#SBATCH --account=mwaeor
+#SBATCH --account=mwasci
 #SBATCH --export=NONE
 
 module load pyephem
