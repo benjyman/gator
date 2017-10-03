@@ -171,7 +171,7 @@ def fix_gpubox_timestamps
     end
 end
 
-def rts_setup(obsid, mins: 5)
+def rts_setup(obsid, mins: 5, peel_number: 1000)
     int_time = integration_time(path: "#{$mwa_dir}/data/#{obsid}")
     # Older data
     if int_time == "0.5"
