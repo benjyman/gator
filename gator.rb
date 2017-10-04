@@ -175,7 +175,7 @@ def fix_gpubox_timestamps
     end
 end
 
-def rts_setup(obsid, mins: 5)
+def rts_setup(obsid, mins: 5, peel_number: 1000)
     int_time = integration_time(path: "#{$mwa_dir}/data/#{obsid}")
     # Older data
     if int_time == "0.5"
@@ -232,8 +232,39 @@ def rts_setup(obsid, mins: 5)
 >>>>>>> 13a28de3d05c2f5ae0acb9dfcf9c800f31acb13b
 #SBATCH --export=NONE
 
+module switch PrgEnv-cray PrgEnv-gnu
+module unload gcc
+module load gcc/4.8.2
+module load cray-libsci
+module load cmake
+module load fftw/3.3.4.3
+module load scipy
+module load lapack
+module load cudatoolkit
+module load astropy
+module load cfitsio
+module load boost
+module load casacore
+module load ephem
+module load readline
+module load gsl
+
 module load pyephem
 module load setuptools
+
+module load pytz
+module load matplotlib
+module load healpy
+module load h5py
+
+export RTSDIR=$MWA_OPS_DIR/CODE/RTS
+export RTSBIN=$RTSDIR/bin
+
+export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$MWA_OPS_DIR/CODE/lib"
+export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$CRAY_LD_LIBRARY_PATH"
+
+export PATH="${PATH}:${MWA_OPS_DIR}/CODE/bin:$RTSBIN"
+
 
 list_gpubox_files.py obsid.dat
 ln -sf ../gpufiles_list.dat .
@@ -306,6 +337,40 @@ def rts_patch(obsid, dependent_jobid, timestamp_dir, mins: 15, peel: false, rts_
 #SBATCH --export=NONE
 
 aprun -n 25 -N 1 #{rts_path} #{ENV["USER"]}_rts_0.in
+module switch PrgEnv-cray PrgEnv-gnu
+module unload gcc
+module load gcc/4.8.2
+module load cray-libsci
+module load cmake
+module load fftw/3.3.4.3
+module load scipy
+module load lapack
+module load cudatoolkit
+module load astropy
+module load cfitsio
+module load boost
+module load casacore
+module load ephem
+module load readline
+module load gsl
+
+module load pyephem
+module load setuptools
+
+module load pytz
+module load matplotlib
+module load healpy
+module load h5py
+
+export RTSDIR=$MWA_OPS_DIR/CODE/RTS
+export RTSBIN=$RTSDIR/bin
+
+export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$MWA_OPS_DIR/CODE/lib"
+export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$CRAY_LD_LIBRARY_PATH"
+
+export PATH="${PATH}:${MWA_OPS_DIR}/CODE/bin:$RTSBIN"
+
+
 /group/mwaeor/cjordan/Software/plot_BPcal_128T.py
 "
 

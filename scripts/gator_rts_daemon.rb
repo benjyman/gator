@@ -11,6 +11,9 @@ OptionParser.new do |opts|
 
     $database = "#{ENV["MYGROUP"]}/rts.sqlite"
 	opts.on("-d", "--database DATABASE", "Specify the database to be used. Default: #{$database}") {|o| $database = o}
+
+    $peel_number = 1000
+	opts.on("-p", "--peel_number NUM", "Peel this many sources with the RTS. Default: #{$peel_number}") {|o| $peel_number = o.to_i}
 end.parse!
 
 abort("$MWA_DIR not defined.") unless ENV["MWA_DIR"]
@@ -78,7 +81,7 @@ begin
             break if len_queue >= max_queue_length
 
             if status == "unqueued"
-                setup_jobid, timestamp = rts_setup(obsid)
+                setup_jobid, timestamp = rts_setup(obsid, peel_number: $peel_number)
                 rts_jobid = rts_patch(obsid, setup_jobid, timestamp, mins: 40, peel: true, rts_path: "/group/mwaeor/CODE/RTS/bin/rts_gpu")
                 puts "Submitted #{obsid} as jobs #{setup_jobid} and #{rts_jobid}."
                 db.execute("UPDATE #{table_name}
