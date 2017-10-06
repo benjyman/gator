@@ -90,6 +90,8 @@ def grid_name(path: '.')
             return "EOR0"
         elsif ra.close_to?(60, tol=3)
             return "EOR1"
+        elsif ra.close_to?(30, tol=5)
+            return "LymanA"
         else
             return "RA=#{ra}"
         end
@@ -188,7 +190,14 @@ def rts_setup(obsid, mins: 5, peel_number: 1000)
         corr_dumps_per_cadence_peel = 4
         number_of_integration_bins_peel = 3
     else
-        abort(sprintf "Unknown integration time! (%s for %s)", int_time, "#{$mwa_dir}/data/#{obsid}")
+        # abort(sprintf "Unknown integration time! (%s for %s)", int_time, "#{$mwa_dir}/data/#{obsid}")
+
+        # Pretend it's 2s
+        corr_dumps_per_cadence_cal = 32
+        number_of_integration_bins_cal = 6
+
+        corr_dumps_per_cadence_peel = 4
+        number_of_integration_bins_peel = 3
     end
     number_of_iterations_cal = 1
     number_of_iterations_peel = 14
@@ -203,12 +212,32 @@ def rts_setup(obsid, mins: 5, peel_number: 1000)
         source_list = "/group/mwaeor/bpindor/PUMA/srclists/srclist_puma-v2_complete.txt"
         patch_source_catalogue_file = "#{$mwa_dir}/data/#{obsid}/srclist_puma-v2_complete_#{obsid}_patch1000.txt"
         peel_source_catalogue_file = "/group/mwaeor/bpindor/PUMA/srclists/srclist_puma-v2_complete_1061316296_peel3000.txt"
+        subband_ids = (1..24).to_a.join(',')
     elsif grid == "EOR1"
         obs_image_centre_ra = "4.0"
         obs_image_centre_dec = "-30.0"
         source_list = "/group/mwaeor/bpindor/PUMA/srclists/srclist_pumaIDR4_EoR1-ext-only+ForA-shap.txt"
         patch_source_catalogue_file = "#{$mwa_dir}/data/#{obsid}/srclist_pumaIDR4_EoR1-ext-only+ForA-shap_#{obsid}_patch1000.txt"
         peel_source_catalogue_file = "/group/mwaeor/bpindor/PUMA/srclists/srclist_pumaIDR4_EoR1-ext-only+ForA-shap_1062364544_peel3000.txt"
+        subband_ids = (1..24).to_a.join(',')
+    elsif grid == "LymanA"
+        obs_image_centre_ra = "2.283"
+        obs_image_centre_dec = "-5.0"
+        source_list = "/group/mwaeor/ctrott/srclist_puma-v2_complete_1186437224_patch1000.txt"
+        patch_source_catalogue_file = "#{$mwa_dir}/data/#{obsid}/srclist_puma-v2_complete_1186437224_patch1000_#{obsid}_patch1000.txt"
+        peel_source_catalogue_file = "/group/mwaeor/ctrott/srclist_puma-v2_complete_1186437224_peel1000.txt"
+
+        # # Low band
+        # subband_ids = (17..24).to_a.join(',')
+        # # Frequency of channel 24, if all bands were contiguous (identical here)
+        # # This frequency is actually about half a channel lower in frequency, i.e. 141.49609*1.28MHz
+        # obs_freq_base = 181.135
+
+        # High band
+        subband_ids = (1..16).to_a.join(',')
+        # Frequency of channel 24, if all bands were contiguous (channel 150 here, even though our lowest is 158)
+        # This frequency is actually about half a channel lower in frequency, i.e. 149.49609*1.28MHz
+        obs_freq_base = 191.355
     else
         abort(sprintf "Unknown grid name! (%s for %s)", grid, "#{$mwa_dir}/data/#{obsid}")
     end
@@ -261,7 +290,7 @@ sed -i \"s|//SourceCatalogueFile.*||; s|\\(SourceCatalogueFile=\\).*|\\1#{patch_
 sed -i \"s|\\(doRFIflagging=\\).*|\\11|\" #{ENV["USER"]}_rts_0.in
 sed -i \"s|\\(ObservationImageCentreRA=\\).*|\\1#{obs_image_centre_ra}|\" #{ENV["USER"]}_rts_0.in
 sed -i \"s|\\(ObservationImageCentreDec=\\).*|\\1#{obs_image_centre_dec}|\" #{ENV["USER"]}_rts_0.in
-sed -i \"s|\\(SubBandIDs=\\).*|\\1#{(1..24).to_a.join(',')}|\" #{ENV["USER"]}_rts_0.in
+sed -i \"s|\\(SubBandIDs=\\).*|\\1#{subband_ids}|\" #{ENV["USER"]}_rts_0.in
 
 sed -i \"s|\\(CorrDumpsPerCadence=\\).*|\\1#{corr_dumps_per_cadence_peel}|\" #{ENV["USER"]}_rts_1.in
 sed -i \"s|\\(NumberOfIntegrationBins=\\).*|\\1#{number_of_integration_bins_peel}|\" #{ENV["USER"]}_rts_1.in
@@ -270,9 +299,13 @@ sed -i \"s|//SourceCatalogueFile.*||; s|\\(SourceCatalogueFile=\\).*|\\1#{peel_s
 sed -i \"s|\\(doRFIflagging=\\).*|\\11|\" #{ENV["USER"]}_rts_1.in
 sed -i \"s|\\(ObservationImageCentreRA=\\).*|\\1#{obs_image_centre_ra}|\" #{ENV["USER"]}_rts_1.in
 sed -i \"s|\\(ObservationImageCentreDec=\\).*|\\1#{obs_image_centre_dec}|\" #{ENV["USER"]}_rts_1.in
-sed -i \"s|\\(SubBandIDs=\\).*|\\1#{(1..24).to_a.join(',')}|\" #{ENV["USER"]}_rts_1.in
-"
+sed -i \"s|\\(SubBandIDs=\\).*|\\1#{subband_ids}|\" #{ENV["USER"]}_rts_1.in
+sed -i \"s|\\(NumberOfSourcesToPeel=\\).*|\\1#{peel_number}|\" #{ENV["USER"]}_rts_1.in
+sed -i \"s|\\(NumberOfIonoCalibrators=\\).*|\\1#{peel_number}|\" #{ENV["USER"]}_rts_1.in
 
+sed -i \"s|\\(ObservationFrequencyBase=\\).*|\\1#{obs_freq_base}|\" #{ENV["USER"]}_rts_0.in
+sed -i \"s|\\(ObservationFrequencyBase=\\).*|\\1#{obs_freq_base}|\" #{ENV["USER"]}_rts_1.in
+"
     Dir.chdir "#{$mwa_dir}/data/#{obsid}"
     fix_gpubox_timestamps
     FileUtils.mkdir_p "#{$mwa_dir}/data/#{obsid}/#{timestamp_dir}"
@@ -286,24 +319,34 @@ end
 
 def rts_patch(obsid, dependent_jobid, timestamp_dir, mins: 15, peel: false, rts_path: "/group/mwaeor/CODE/RTS/bin/rts_gpu")
     filename = "rts_patch.sh"
+
+    # Determine the number of nodes required, based on the number of SubBandIDs specified.
+    # num_nodes = 25
+    # puts File.open(Dir.glob("*.in").sort.first, 'r') { |f| f.read.match(/SubBandIDs=(\S+)/) }[1].split(',').length
+    # num_nodes = 1 + File.open(Dir.glob("*.in").sort.first, 'r') { |f| f.read.match(/SubBandIDs=(\S+)/) }[1].split(',').length
+    # num_nodes = 9
+    num_nodes = 17
+
     contents = "#!/bin/bash
 
 #SBATCH --job-name=pa_#{obsid}
 #SBATCH --output=RTS-patch-#{obsid}-%A.out
-#SBATCH --nodes=25
+#SBATCH --nodes=#{num_nodes}
 #SBATCH --ntasks-per-node=1
 #SBATCH --time=#{mins2hms(mins)}
 #SBATCH --partition=gpuq
 #SBATCH --account=#{$project}
 #SBATCH --export=NONE
 
-aprun -n 25 -N 1 #{rts_path} #{ENV["USER"]}_rts_0.in
+aprun -n #{num_nodes} -N 1 #{rts_path} #{ENV["USER"]}_rts_0.in
 /group/mwaeor/cjordan/Software/plot_BPcal_128T.py
+/group/mwaeor/cjordan/Software/plot_CalSols.py --base_dir=`pwd` -n #{obsid} -i
+touch flagged_tiles.txt
+aprun -n #{num_nodes} -N 1 #{rts_path} #{ENV["USER"]}_rts_0.in
 "
+    contents << "aprun -n #{num_nodes} -N 1 #{rts_path} #{ENV["USER"]}_rts_1.in\n" if peel
 
     Dir.chdir "#{$mwa_dir}/data/#{obsid}/#{timestamp_dir}"
-    contents << "aprun -n 25 -N 1 #{rts_path} #{ENV["USER"]}_rts_1.in\n" if peel
-
     write(filename, contents)
     write("rts_version_used.txt", rts_version(rts_path))
     sbatch("--dependency=afterok:#{dependent_jobid} #{filename}").match(/Submitted batch job (\d+)/)[1].to_i
@@ -344,8 +387,12 @@ def rts_status(obsid, timestamp_dir: nil)
         rts_stdout_log = Dir.glob("#{$mwa_dir}/data/#{obsid}/RTS*.out").sort_by { |l| File.mtime(l) }.last
     end
 
+    # If there's no log, then maybe the job didn't run.
+    if not rts_stdout_log
+        status = "???"
+        final = "*** no node001 log"
     # If it's too big, then it failed.
-    if File.stat(rts_stdout_log).size.to_f > 1000000
+    elsif File.stat(rts_stdout_log).size.to_f > 1000000
         status = "failed"
         final = "*** huge stdout - tiles probably need to be flagged."
     # If there's a line about "could not open...", the data isn't there.
