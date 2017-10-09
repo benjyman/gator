@@ -14,6 +14,9 @@ OptionParser.new do |opts|
 
     $peel_number = 1000
 	opts.on("-p", "--peel_number NUM", "Peel this many sources with the RTS. Default: #{$peel_number}") {|o| $peel_number = o.to_i}
+
+    $sleep_time = 60
+	opts.on("-s", "--sleep_time TIME", "Amount of time to wait before re-analysing the queue (seconds). Default: #{$sleep_time}") {|o| $sleep_time = o.to_i}
 end.parse!
 
 abort("$MWA_DIR not defined.") unless ENV["MWA_DIR"]
@@ -111,7 +114,7 @@ begin
         end
 
         puts "Sleeping...\n\n"
-        sleep 60
+        sleep $sleep_time
     end
 
 rescue SQLite3::Exception => e 

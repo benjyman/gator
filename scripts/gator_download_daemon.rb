@@ -13,7 +13,10 @@ OptionParser.new do |opts|
 	opts.on("-d", "--database DATABASE", "Specify the database to be used. Default: #{$database}") {|o| $database = o}
 
     $retry_time = 1800
-	opts.on("-r", "--retry_time TIME", "If an obsid download job failed, wait this long before retrying (seconds). Default: #{$retry_time}") {|o| $retry_time = o}
+	opts.on("-r", "--retry_time TIME", "If an obsid download job failed, wait this long before retrying (seconds). Default: #{$retry_time}") {|o| $retry_time = o.to_i}
+
+    $sleep_time = 60
+	opts.on("-s", "--sleep_time TIME", "Amount of time to wait before re-analysing the queue (seconds). Default: #{$sleep_time}") {|o| $sleep_time = o.to_i}
 end.parse!
 
 abort("$MWA_DIR not defined.") unless ENV["MWA_DIR"]
@@ -114,7 +117,7 @@ begin
         end
 
         puts "Sleeping...\n\n"
-        sleep 60
+        sleep $sleep_time
     end
 
 rescue SQLite3::Exception => e 
