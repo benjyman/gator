@@ -102,13 +102,19 @@ def alter_config(text, key, value)
     text.sub!(results.last.join(''), "#{key}=#{value}\n")
 end
 
-def generate_slurm_header(job_name, machine, partition, mins)
+def generate_slurm_header(job_name, machine, partition, mins, nodes, ntasks_per_node: 1, output: nil)
+    stdout = if output
+                 output
+             else
+                 "#{job_name}-%A.out" unless output
+             end
+
     return \
 "#!/bin/bash
 #SBATCH --job-name=#{job_name}
-#SBATCH --output=#{job_name}-%A.out
-#SBATCH --ntasks=1
-#SBATCH --ntasks-per-node=1
+#SBATCH --output=#{stdout}
+#SBATCH --nodes=#{nodes}
+#SBATCH --ntasks-per-node=#{ntasks_per_node}
 #SBATCH --time=#{mins2hms(mins)}
 #SBATCH --clusters=#{machine}
 #SBATCH --partition=#{partition}
@@ -119,7 +125,8 @@ end
 
 def rts_version(path)
     git_dir = path.split("/bin")[0]
-    path << "\n\n" << `git --git-dir #{git_dir}/.git log "HEAD^..HEAD"`
+    git_commit = `git --git-dir #{git_dir}/.git log "HEAD^..HEAD"`
+    "#{path}\n\n#{git_commit}"
 end
 
 def flag_tiles
@@ -129,6 +136,52 @@ def flag_tiles
     bp_output.scan(/\(flag\s+(\d+)\?\)/).flatten.uniq.join("\n")
 end
 
+def check_rts_status(path: ".")
+    stdout_log = Dir.glob("#{path}/RTS*.out").sort_by { |l| File.mtime(l) }.last
+
+    # If there's no log, then maybe the job didn't run.
+    if not stdout_log
+        status = "???"
+        final = "*** no logs"
+    # If it's too big, then it failed.
+    elsif File.stat(stdout_log).size.to_f > 1000000
+        status = "failed"
+        final = "*** huge stdout - tiles probably need to be flagged."
+    # If there's a line about "could not open...", the data isn't there.
+    elsif File.read(stdout_log).match(/Could not open array file for reading/)
+        status = "no data"
+        final = "*** probably no gpubox files available for this obsid."
+    elsif File.read(stdout_log).match(/Error: Unable to set weighted average frequency. No unflagged channels/)
+        status = "???"
+        final = "Error: Unable to set weighted average frequency. No unflagged channels"
+    end
+
+    # Skip to the end if we already have a status.
+    unless status
+        # Read the latest node???.log file.
+        node_log = Dir.glob("#{path}/*node*.log").sort_by { |l| File.mtime(l) }.last
+        if not node_log
+            status = "???"
+            final = "*** no node logs"
+        else
+            # Read the last line of the log.
+            final = File.readlines(node_log).last.strip
+            if final =~ /LogDone. Closing file/
+                # Check the file size. Big enough -> peeled. Too small -> patched.
+                if File.stat(node_log).size > 10000000
+                    status = "peeled"
+                else
+                    status = "patched"
+                end
+            else
+                status = "failed"
+            end
+        end
+    end
+
+    return status, final
+end
+
 class Obsid
     attr_reader :obsid,
                 :type,
@@ -136,6 +189,13 @@ class Obsid
                 :setup_jobid,
                 :patch_jobid,
                 :peel_jobid,
+                :high_setup_jobid,
+                :high_patch_jobid,
+                :high_peel_jobid,
+                :low_setup_jobid,
+                :low_patch_jobid,
+                :low_peel_jobid,
+                :timestamp_dir,
                 :status,
                 :final,
                 :rts_path,
@@ -200,7 +260,7 @@ class Obsid
     end
 
     def download(mins: 30)
-        contents = generate_slurm_header("dl_#{@obsid}", "zeus", "copyq", mins)
+        contents = generate_slurm_header("dl_#{@obsid}", "zeus", "copyq", mins, 1, output: "getNGASdata-#{@obsid}-%A.out")
         contents << "
 module load pyephem
 module load setuptools
@@ -219,6 +279,10 @@ obsdownload2.py -o #{@obsid} -u
     end
 
     def rts(setup_mins: 5, cal_mins: 40, patch: true, peel: true, peel_number: 1000, timestamp: true, rts_path: "/group/mwaeor/CODE/RTS/bin/rts_gpu")
+        if $peel and not $patch
+            abort "Cannot peel if we are not patching; exiting."
+        end
+
         integration_time unless @int_time
         @peel_number = peel_number
         @rts_path = rts_path
@@ -274,9 +338,10 @@ obsdownload2.py -o #{@obsid} -u
         elsif @type == "LymanA"
             @obs_image_centre_ra = "2.283"
             @obs_image_centre_dec = "-5.0"
-            @source_list = "/group/mwaeor/ctrott/srclist_puma-v2_complete_1186437224_patch1000.txt"
-            @patch_source_catalogue_file = "#{$mwa_dir}/data/#{@obsid}/srclist_puma-v2_complete_1186437224_patch1000_#{@obsid}_patch1000.txt"
+            @source_list = "/group/mwaeor/bpindor/PUMA/srclists/srclist_puma-v2_complete.txt"
+            @patch_source_catalogue_file = "#{@path}/srclist_puma-v2_complete_1186437224_patch1000_#{@obsid}_patch1000.txt"
             @peel_source_catalogue_file = "/group/mwaeor/ctrott/srclist_puma-v2_complete_1186437224_peel1000.txt"
+            # @peel_source_catalogue_file = "/astro/mwaeor/cjordan/LymanA_puma-v2_1186437224_peel3000.txt"
 
             # High band
             # Frequency of channel 24, if all bands were contiguous (identical here, i.e. channel 142)
@@ -286,6 +351,8 @@ obsdownload2.py -o #{@obsid} -u
             @timestamp_dir << "_high"
             rts_setup(mins: setup_mins)
             rts_patch(mins: cal_mins, peel: peel) if patch
+            @high_setup_jobid = @setup_jobid
+            @high_patch_jobid = @patch_jobid
 
             # Low band
             # Frequency of channel 24, if all bands were contiguous (channel 150 here, even though our lowest is 158)
@@ -295,23 +362,16 @@ obsdownload2.py -o #{@obsid} -u
             @timestamp_dir = @timestamp_dir.split('_').select { |e| e =~ /\d/ }.join('_') << "_low"
             rts_setup(mins: setup_mins)
             rts_patch(mins: cal_mins, peel: peel) if patch
+            @low_setup_jobid = @setup_jobid
+            @low_patch_jobid = @patch_jobid
         else
             abort(sprintf "Unknown grid name! (%s for %s)", @type, @obsid)
         end
     end
 
     def rts_setup(mins: 5)
-        contents = "#!/bin/bash
-
-#SBATCH --job-name=se_#{@obsid}
-#SBATCH --output=RTS-setup-#{@obsid}-%A.out
-#SBATCH --ntasks=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --time=#{mins2hms(mins)}
-#SBATCH --partition=gpuq
-#SBATCH --account=#{$project}
-#SBATCH --export=NONE
-
+        contents = generate_slurm_header("se_#{@obsid}", "galaxy", "gpuq", mins, 1, output: "RTS-setup-#{@obsid}-%A.out")
+        contents << "
 module load pyephem
 module load setuptools
 
@@ -323,7 +383,7 @@ generate_dynamic_RTS_sourcelists.py -n 1000 \\
                                     --obslist=#{@path}/#{@timestamp_dir}/obsid.dat
 
 generate_mwac_qRTS_auto.py #{@path}/#{@timestamp_dir}/obsid.dat \\
-                           cj 24 \\
+                           #{ENV["USER"]} 24 \\
                            /group/mwaeor/bpindor/templates/EOR0_selfCalandPeel_PUMA1000_WriteUV_80khz_cotter_template.dat \\
                            --auto \\
                            --chunk_number=0 \\
@@ -378,17 +438,8 @@ sed -i \"s|\\(ObservationFrequencyBase=\\).*|\\1#{@obs_freq_base}|\" #{ENV["USER
         num_nodes = @subband_ids.split(',').length + 1
 
         filename = "rts_patch.sh"
-        contents = "#!/bin/bash
-
-#SBATCH --job-name=pa_#{@obsid}
-#SBATCH --output=RTS-patch-#{@obsid}-%A.out
-#SBATCH --nodes=#{num_nodes}
-#SBATCH --ntasks-per-node=1
-#SBATCH --time=#{mins2hms(mins)}
-#SBATCH --partition=gpuq
-#SBATCH --account=#{$project}
-#SBATCH --export=NONE
-
+        contents = generate_slurm_header("pa_#{@obsid}", "galaxy", "gpuq", mins, num_nodes, output: "RTS-patch-#{@obsid}-%A.out")
+        contents << "
 aprun -n #{num_nodes} -N 1 #{@rts_path} #{ENV["USER"]}_rts_0.in
 /group/mwaeor/cjordan/Software/plot_BPcal_128T.py
 /group/mwaeor/cjordan/Software/plot_CalSols.py --base_dir=`pwd` -n #{@obsid} -i
@@ -407,17 +458,8 @@ aprun -n #{num_nodes} -N 1 #{@rts_path} #{ENV["USER"]}_rts_0.in
         num_nodes = @subband_ids.split(',').length + 1
 
         filename = "rts_peel.sh"
-        contents = "#!/bin/bash
-
-#SBATCH --job-name=pe_#{@obsid}
-#SBATCH --output=RTS-peel-#{@obsid}-%A.out
-#SBATCH --nodes=25
-#SBATCH --ntasks-per-node=1
-#SBATCH --time=#{mins2hms(mins)}
-#SBATCH --partition=gpuq
-#SBATCH --account=#{$project}
-#SBATCH --export=NONE
-
+        contents = generate_slurm_header("pe_#{@obsid}", "galaxy", "gpuq", mins, num_nodes, output: "RTS-peel-#{@obsid}-%A.out")
+        contents << "
 aprun -n #{num_nodes} -N 1 #{@rts_path} #{ENV["USER"]}_rts_1.in
 "
 
@@ -427,46 +469,6 @@ aprun -n #{num_nodes} -N 1 #{@rts_path} #{ENV["USER"]}_rts_1.in
     end
 
     def rts_status
-        @stdout_log = Dir.glob("#{@path}/#{@timestamp_dir}/RTS*.out").sort_by { |l| File.mtime(l) }.last
-
-        # If there's no log, then maybe the job didn't run.
-        if not @stdout_log
-            @status = "???"
-            @final = "*** no node001 log"
-        # If it's too big, then it failed.
-        elsif File.stat(@stdout_log).size.to_f > 1000000
-            @status = "failed"
-            @final = "*** huge stdout - tiles probably need to be flagged."
-        # If there's a line about "could not open...", the data isn't there.
-        elsif File.read(@stdout_log).match(/Could not open array file for reading/)
-            @status = "no data"
-            @final = "*** probably no gpubox files available for this obsid."
-        elsif File.read(@stdout_log).match(/Error: Unable to set weighted average frequency. No unflagged channels/)
-            @status = "???"
-            @final = "Error: Unable to set weighted average frequency. No unflagged channels"
-        end
-
-        # Skip to the end if we already have a status.
-        unless @status
-            # Read the latest node001.log file.
-            @node001_log = Dir.glob("#{@path}/#{@timestamp_dir}/*node001.log").sort_by { |l| File.mtime(l) }.last
-            if not @node001_log
-                @status = "???"
-                @final = "*** no node001 log"
-            else
-                # Read the last line of the log.
-                @final = File.readlines(node001_log).last.strip
-                if @final =~ /LogDone. Closing file/
-                    # Check the file size. Big enough -> peeled. Too small -> patched.
-                    if File.stat(@node001_log).size > 10000000
-                        @status = "peeled"
-                    else
-                        @status = "patched"
-                    end
-                else
-                    @status = "failed"
-                end
-            end
-        end
+        check_rts_status(path: "#{@path}/#{@timestamp_dir}")
     end
 end
