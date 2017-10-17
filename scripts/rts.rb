@@ -16,15 +16,33 @@ OptionParser.new do |opts|
 
     $run_time = 40
 	opts.on("-t", "--run_time NUM", "Allow the RTS to run for this many minutes. Default: #{$run_time}") {|o| $run_time = o.to_i}
+
+    $timestamp = true
+	opts.on("--timestamp", "Disable the usage of a timestamp directory for this RTS run. Default: #{$timestamp}") {$timestamp = false}
+
+    $patch = true
+	opts.on("--patch", "Disable the patch step. Default: #{$patch}") {$patch = false}
+
+    $peel = true
+	opts.on("--peel", "Disable the peel step. Default: #{$peel}") {$peel = false}
+
+    $rts_path = "/group/mwaeor/CODE/RTS/bin/rts_gpu"
+	opts.on("--rts_path", "Specify the path to the RTS executable. Default: #{$peel}") {|o| $rts_path = o}
 end.parse!
 
 
 if __FILE__ == $0
     abort "No obsids supplied!" if ARGV.length == 0
 
-    obtain_obsids(ARGV).each do |o|
-        setup_jobid, timestamp = rts_setup(o, peel_number: $peel_number)
-        puts setup_jobid
-        puts patch_jobid = rts_patch(o, setup_jobid, timestamp, mins: $run_time, peel: true)
+    obtain_obsids(ARGV).each do |obsid|
+        o = Obsid.new(obsid)
+        o.rts(setup_mins: 5,
+              cal_mins: $run_time,
+              patch: $patch,
+              peel: $peel,
+              peel_number: $peel_number,
+              timestamp: $timestamp,
+              rts_path: $rts_path)
+        puts "#{obsid}: #{o.type}"
     end
 end

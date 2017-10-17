@@ -13,7 +13,10 @@ OptionParser.new do |opts|
 	opts.on("-d", "--database DATABASE", "Specify the database to be used. Default: #{$database}") {|o| $database = o}
 
     $retry_time = 1800
-	opts.on("-r", "--retry_time TIME", "If an obsid download job failed, wait this long before retrying (seconds). Default: #{$retry_time}") {|o| $retry_time = o}
+	opts.on("-r", "--retry_time TIME", "If an obsid download job failed, wait this long before retrying (seconds). Default: #{$retry_time}") {|o| $retry_time = o.to_i}
+
+    $sleep_time = 60
+	opts.on("-s", "--sleep_time TIME", "Amount of time to wait before re-analysing the queue (seconds). Default: #{$sleep_time}") {|o| $sleep_time = o.to_i}
 end.parse!
 
 abort("$MWA_DIR not defined.") unless ENV["MWA_DIR"]
@@ -83,9 +86,10 @@ begin
 
             # If the obsid is unqueued, download it.
             # If the failed obsid has been waiting for long enough, try downloading again.
-            # if status == "unqueued" or (status == "failed" and (Time.now - Time.parse(r["LastChecked"])) > $retry_time)
-            if status == "unqueued"
-                jobid = download(obsid, mins: 30)
+            if status == "unqueued" or (status == "failed" and (Time.now - Time.parse(r["LastChecked"])) > $retry_time)
+                obj = Obsid.new(obsid)
+                obj.download
+                jobid = obj.download_jobid
                 puts "Submitted #{obsid} as job #{jobid}"
                 db.execute("UPDATE #{table_name}
                             SET Status = 'downloading',
@@ -93,31 +97,23 @@ begin
                                 LastChecked = '#{Time.now}'
                             WHERE Obsid = #{obsid}")
                 len_queue += 1
-            elsif status == "failed" and (Time.now - Time.parse(r["LastChecked"])) > $retry_time
-                jobid = download(obsid, mins: 30)
-                puts "Submitted #{obsid} as job #{jobid}"
-                db.execute("UPDATE #{table_name}
-                            SET Status = 'downloading',
-                                JobID = #{jobid}
-                            WHERE Obsid = #{obsid}")
-                len_queue += 1
             end
-        end
 
-        # Check the status of all obsids - have they all been downloaded? If so, exit.
-        num_not_downloaded = db.execute("SELECT * FROM #{table_name} WHERE NOT Status = 'downloaded'").length
-        if num_not_downloaded == 0
-            puts "\nJobs done."
-            exit 
-        else
-            puts "Number of obsids not yet downloaded: #{num_not_downloaded}"
-        end
+            # Check the status of all obsids - have they all been downloaded? If so, exit.
+            num_not_downloaded = db.execute("SELECT * FROM #{table_name} WHERE NOT Status = 'downloaded'").length
+            if num_not_downloaded == 0
+                puts "\nJobs done."
+                exit
+            else
+                puts "Number of obsids not yet downloaded: #{num_not_downloaded}"
+            end
 
-        puts "Sleeping...\n\n"
-        sleep 60
+            puts "Sleeping...\n\n"
+            sleep $sleep_time
+        end
     end
 
-rescue SQLite3::Exception => e 
+rescue SQLite3::Exception => e
     puts "#{e.class}: #{e}"
 
 ensure
