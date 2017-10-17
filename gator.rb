@@ -79,6 +79,18 @@ def integration_time(path: '.')
     File.open(metafits, 'r') { |f| f.read(10000).match(/INTTIME \s*= \s*(\S+)/) }[1]
 end
 
+def ra_pointing(path: '.')
+    metafits = Dir.glob("#{path}/*metafits*").sort_by { |f| File.size(f) }.last
+    abort("#{Dir.pwd}: metafits file not found!") unless metafits
+    File.open(metafits, 'r') { |f| f.read(10000).match(/RA \s*= \s*(\S+)/) }[1]
+end
+    
+def dec_pointing(path: '.')
+    metafits = Dir.glob("#{path}/*metafits*").sort_by { |f| File.size(f) }.last
+    abort("#{Dir.pwd}: metafits file not found!") unless metafits
+    File.open(metafits, 'r') { |f| f.read(10000).match(/DEC \s*= \s*(\S+)/) }[1]
+end
+
 def grid_name(path: '.')
     metafits = Dir.glob("#{path}/*metafits*").sort_by { |f| File.size(f) }.last
     abort("#{Dir.pwd}: metafits file not found!") unless metafits
@@ -91,7 +103,8 @@ def grid_name(path: '.')
         elsif ra.close_to?(60, tol=3)
             return "EOR1"
         else
-            return "RA=#{ra}"
+            #return "RA=#{ra}"
+            return "SKY"
         end
     else
         # We have to use the RA tag instead.
@@ -101,7 +114,8 @@ def grid_name(path: '.')
         elsif ra.close_to?(60, tol=5)
             return "EOR1"
         else
-            return "RA=#{ra}"
+            #return "RA=#{ra}"
+            return "SKY"
         end
     end
 end
@@ -138,19 +152,16 @@ def download(obsid, mins: 30)
 #SBATCH --time=#{mins2hms(mins)}
 #SBATCH --clusters=zeus
 #SBATCH --partition=copyq
-<<<<<<< HEAD
-#SBATCH --account=mwasci
-======
 #SBATCH --account=#{$project}
->>>>>>> 13a28de3d05c2f5ae0acb9dfcf9c800f31acb13b
 #SBATCH --export=NONE
 
 module load pyephem
 module load setuptools
 cd #{$mwa_dir}/data
-obsdownload.py -o #{obsid} --chstart=1 --chcount=24
-obsdownload.py -o #{obsid} -f
-obsdownload.py -o #{obsid} -m
+obsdownload.py -o #{obsid}
+#obsdownload.py -o #{obsid} --chstart=1 --chcount=24
+#obsdownload.py -o #{obsid} -f
+#obsdownload.py -o #{obsid} -m
 #obsdownload2.py -o #{obsid} -u
 "
 
@@ -175,7 +186,7 @@ def fix_gpubox_timestamps
     end
 end
 
-def rts_setup(obsid, mins: 5, peel_number: 1000)
+def rts_setup(obsid, mins: 10, peel_number: 300)
     int_time = integration_time(path: "#{$mwa_dir}/data/#{obsid}")
     # Older data
     if int_time == "0.5"
@@ -204,7 +215,9 @@ def rts_setup(obsid, mins: 5, peel_number: 1000)
     if grid == "EOR0"
         obs_image_centre_ra = "0."
         obs_image_centre_dec = "-27.0"
-        source_list = "/group/mwaeor/bpindor/PUMA/srclists/srclist_puma-v2_complete.txt"
+	# test modification
+        source_list="/group/mwaeor/bpindor/PUMA/srclists/srclist_puma-v2_complete.txt"
+	#source_list="/group/mwasci/gdrouart/srclist_database/srclist_puma-v2_complete.txt"
         patch_source_catalogue_file = "#{$mwa_dir}/data/#{obsid}/srclist_puma-v2_complete_#{obsid}_patch1000.txt"
         peel_source_catalogue_file = "/group/mwaeor/bpindor/PUMA/srclists/srclist_puma-v2_complete_1061316296_peel3000.txt"
     elsif grid == "EOR1"
@@ -213,6 +226,14 @@ def rts_setup(obsid, mins: 5, peel_number: 1000)
         source_list = "/group/mwaeor/bpindor/PUMA/srclists/srclist_pumaIDR4_EoR1-ext-only+ForA-shap.txt"
         patch_source_catalogue_file = "#{$mwa_dir}/data/#{obsid}/srclist_pumaIDR4_EoR1-ext-only+ForA-shap_#{obsid}_patch1000.txt"
         peel_source_catalogue_file = "/group/mwaeor/bpindor/PUMA/srclists/srclist_pumaIDR4_EoR1-ext-only+ForA-shap_1062364544_peel3000.txt"
+    elsif grid == "SKY"
+        obs_image_centre_ra = ra_pointing(path: "#{$mwa_dir}/data/#{obsid}")
+        obs_image_centre_dec = dec_pointing(path: "#{$mwa_dir}/data/#{obsid}")
+	source_list = "/group/mwasci/gdrouart/Softwares/srclists/srclist_puma-v3_complete.txt"
+        patch_source_catalogue_file = "#{$mwa_dir}/data/#{obsid}/srclist_#{obsid}_patch1000.txt"
+    #peel_source_catalogue_file = "#{$mwa_dir}/data/#{obsid}/srclist_puma-v2_complete_#{obsid}_peel3000.txt"
+        peel_source_catalogue_file = patch_source_catalogue_file
+	# TODO: to sort out the source to be peeled.
     else
         abort(sprintf "Unknown grid name! (%s for %s)", grid, "#{$mwa_dir}/data/#{obsid}")
     end
@@ -225,11 +246,7 @@ def rts_setup(obsid, mins: 5, peel_number: 1000)
 #SBATCH --ntasks-per-node=1
 #SBATCH --time=#{mins2hms(mins)}
 #SBATCH --partition=gpuq
-<<<<<<< HEAD
-#SBATCH --account=mwasci
-=======
 #SBATCH --account=#{$project}
->>>>>>> 13a28de3d05c2f5ae0acb9dfcf9c800f31acb13b
 #SBATCH --export=NONE
 
 module switch PrgEnv-cray PrgEnv-gnu
@@ -260,39 +277,40 @@ module load h5py
 export RTSDIR=$MWA_OPS_DIR/CODE/RTS
 export RTSBIN=$RTSDIR/bin
 
-export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$MWA_OPS_DIR/CODE/lib"
-export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$CRAY_LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH+=\":$MWA_OPS_DIR/CODE/lib\"
+export LD_LIBRARY_PATH+=\":$CRAY_LD_LIBRARY_PATH\"
 
-export PATH="${PATH}:${MWA_OPS_DIR}/CODE/bin:$RTSBIN"
+export PATH=\"${PATH}:${MWA_OPS_DIR}/CODE/bin:$RTSBIN\"
 
 
 list_gpubox_files.py obsid.dat
 ln -sf ../gpufiles_list.dat .
 
-generate_dynamic_RTS_sourcelists.py -n 1000 \\
+# generate a calibration sourcelist depending on the obsID
+/group/mwasci/gdrouart/EOR_scripts/generate_dynamic_RTS_sourcelists.py -n 1000 \\
                                     --sourcelist=#{source_list} \\
                                     --obslist=#{$mwa_dir}/data/#{obsid}/#{timestamp_dir}/obsid.dat
 
-generate_mwac_qRTS_auto.py #{$mwa_dir}/data/#{obsid}/#{timestamp_dir}/obsid.dat \\
-                           cj 24 \\
+# generate the template to run the data reduction, wrapper around sRTS_auto_wrapper_XXX.sh? 
+/group/mwasci/gdrouart/EOR_scripts/generate_mwac_qRTS_auto.py #{$mwa_dir}/data/#{obsid}/#{timestamp_dir}/obsid.dat \\
+                           #{ENV["USER"]} 24 \\
                            /group/mwaeor/bpindor/templates/EOR0_selfCalandPeel_PUMA1000_WriteUV_80khz_cotter_template.dat \\
                            --auto \\
                            --chunk_number=0 \\
-                           --channel_flags=/group/mwaeor/bpindor/templates/flagged_channels_default.txt \\
                            --dynamic_sourcelist=1000 \\
                            --sourcelist=#{source_list}
 
-reflag_mwaf_files.py #{$mwa_dir}/data/#{obsid}/#{timestamp_dir}/obsid.dat
+# do some reflagging of the tiles
+/group/mwasci/gdrouart/EOR_scripts/reflag_mwaf_files.py #{$mwa_dir}/data/#{obsid}/#{timestamp_dir}/obsid.dat
 
-generate_RTS_in_mwac.py #{$mwa_dir}/data/#{obsid} \\
-                        cj 24 128T \\
-                        --templates=/group/mwaeor/bpindor/templates/EOR0_selfCalandPeel_PUMA1000_WriteUV_80khz_cotter_template.dat \\
+# generate the RTS input scripts (.in)
+/group/mwasci/gdrouart/EOR_scripts/generate_RTS_in_mwac.py #{$mwa_dir}/data/#{obsid} \\
+                        #{ENV["USER"]} 24 128T \\
                         --header=#{obsid}_metafits_ppds.fits \\
-                        --channel_flags=/group/mwaeor/bpindor/templates/flagged_channels_default.txt
+                        --channel_flags=/astro/mwasci/gdrouart/RTS/utils/flagged_channels_default.txt \\
+                        --templates=/group/mwaeor/bpindor/templates/EOR0_selfCalandPeel_PUMA1000_WriteUV_80khz_cotter_template.dat
 
-mv cj_rts_0.in #{ENV["USER"]}_rts_0.in
-mv cj_rts_1.in #{ENV["USER"]}_rts_1.in
-
+# a bunch of change for the parameter to be adapted to the obsID ?
 sed -i \"s|\\(CorrDumpsPerCadence=\\).*|\\1#{corr_dumps_per_cadence_cal}|\" #{ENV["USER"]}_rts_0.in
 sed -i \"s|\\(NumberOfIntegrationBins=\\).*|\\1#{number_of_integration_bins_cal}|\" #{ENV["USER"]}_rts_0.in
 sed -i \"s|\\(NumberOfIterations=\\).*|\\1#{number_of_iterations_cal}|\" #{ENV["USER"]}_rts_0.in
@@ -336,7 +354,6 @@ def rts_patch(obsid, dependent_jobid, timestamp_dir, mins: 15, peel: false, rts_
 #SBATCH --account=#{$project}
 #SBATCH --export=NONE
 
-aprun -n 25 -N 1 #{rts_path} #{ENV["USER"]}_rts_0.in
 module switch PrgEnv-cray PrgEnv-gnu
 module unload gcc
 module load gcc/4.8.2
@@ -365,11 +382,12 @@ module load h5py
 export RTSDIR=$MWA_OPS_DIR/CODE/RTS
 export RTSBIN=$RTSDIR/bin
 
-export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$MWA_OPS_DIR/CODE/lib"
-export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$CRAY_LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH+=\":$MWA_OPS_DIR/CODE/lib\"
+export LD_LIBRARY_PATH+=\":$CRAY_LD_LIBRARY_PATH\"
 
-export PATH="${PATH}:${MWA_OPS_DIR}/CODE/bin:$RTSBIN"
+export PATH=\"${PATH}:${MWA_OPS_DIR}/CODE/bin:$RTSBIN\"
 
+aprun -n 25 -N 1 #{rts_path} #{ENV["USER"]}_rts_0.in
 
 /group/mwaeor/cjordan/Software/plot_BPcal_128T.py
 "
