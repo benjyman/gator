@@ -8,6 +8,8 @@ if __FILE__ == $0
     abort "No obsids supplied!" if ARGV.length == 0
 
     obtain_obsids(ARGV).each do |o|
-        puts download(o)
+        obj = Obsid.new(o)
+        obj.download
+        puts obj.download_jobid
     end
 end

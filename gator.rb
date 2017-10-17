@@ -5,8 +5,7 @@ $mwa_dir = ENV["MWA_DIR"].chomp('/')
 $project = ENV["PAWSEY_PROJECT"]
 $download_modules = "
 module purge
-module load PrgEnv-gnu \\
-            pyephem \\
+module load pyephem \\
             setuptools
 "
 $rts_modules = "
@@ -219,6 +218,7 @@ class Obsid
     attr_reader :obsid,
                 :type,
                 :path,
+                :download_jobid,
                 :setup_jobid,
                 :patch_jobid,
                 :peel_jobid,
@@ -307,7 +307,7 @@ obsdownload2.py -o #{@obsid} -u
         FileUtils.mkdir_p @path unless Dir.pwd == @path
         Dir.chdir @path unless Dir.pwd == @path
         write("#{@obsid}.sh", contents)
-        sbatch("#{@obsid}.sh").match(/Submitted batch job (\d+)/)[1].to_i
+        @download_jobid = sbatch("#{@obsid}.sh").match(/Submitted batch job (\d+)/)[1].to_i
     end
 
     def rts(setup_mins: 5, cal_mins: 40, patch: true, peel: true, peel_number: 1000, timestamp: true, rts_path: "/group/mwaeor/CODE/RTS/bin/rts_gpu")
