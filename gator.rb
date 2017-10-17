@@ -3,6 +3,39 @@ require "fileutils"
 abort("$MWA_DIR not defined.") unless ENV["MWA_DIR"]
 $mwa_dir = ENV["MWA_DIR"].chomp('/')
 $project = ENV["PAWSEY_PROJECT"]
+$download_modules = "
+module purge
+module load PrgEnv-gnu \\
+            pyephem \\
+            setuptools
+"
+$rts_modules = "
+module purge
+module load PrgEnv-gnu \\
+            alps \\
+            cray-libsci \\
+            cmake \\
+            fftw \\
+            lapack \\
+            cudatoolkit \\
+            cfitsio \\
+            boost \\
+            casacore \\
+            ephem \\
+            readline \\
+            gsl \\
+            scipy \\
+            astropy \\
+            pytz \\
+            pyephem \\
+            psycopg2 \\
+            setuptools \\
+            matplotlib
+
+export LD_LIBRARY_PATH=/group/mwaops/CODE/lib:/lib64:/usr/lib64:${LD_LIBRARY_PATH}
+# For some stupid reason, \"module load cfitsio\" above does not put the appropriate library path in.
+export LD_LIBRARY_PATH=/pawsey/cle52up04/devel/PrgEnv-gnu/5.2.82/gcc/4.8.2/ivybridge/cfitsio/3370/lib:${LD_LIBRARY_PATH}
+"
 
 class Float
     def close_to?(n, tol=0.1)
@@ -262,8 +295,7 @@ class Obsid
     def download(mins: 30)
         contents = generate_slurm_header("dl_#{@obsid}", "zeus", "copyq", mins, 1, output: "getNGASdata-#{@obsid}-%A.out")
         contents << "
-module load pyephem
-module load setuptools
+#{$download_modules}
 
 cd #{$mwa_dir}/data
 # obsdownload.py -o #{@obsid} --chstart=1 --chcount=24
@@ -372,8 +404,7 @@ obsdownload2.py -o #{@obsid} -u
     def rts_setup(mins: 5)
         contents = generate_slurm_header("se_#{@obsid}", "galaxy", "gpuq", mins, 1, output: "RTS-setup-#{@obsid}-%A.out")
         contents << "
-module load pyephem
-module load setuptools
+#{$rts_modules}
 
 list_gpubox_files.py obsid.dat
 ln -sf ../gpufiles_list.dat .
@@ -440,6 +471,8 @@ sed -i \"s|\\(ObservationFrequencyBase=\\).*|\\1#{@obs_freq_base}|\" #{ENV["USER
         filename = "rts_patch.sh"
         contents = generate_slurm_header("pa_#{@obsid}", "galaxy", "gpuq", mins, num_nodes, output: "RTS-patch-#{@obsid}-%A.out")
         contents << "
+#{$rts_modules}
+
 aprun -n #{num_nodes} -N 1 #{@rts_path} #{ENV["USER"]}_rts_0.in
 /group/mwaeor/cjordan/Software/plot_BPcal_128T.py
 /group/mwaeor/cjordan/Software/plot_CalSols.py --base_dir=`pwd` -n #{@obsid} -i
@@ -460,6 +493,8 @@ aprun -n #{num_nodes} -N 1 #{@rts_path} #{ENV["USER"]}_rts_0.in
         filename = "rts_peel.sh"
         contents = generate_slurm_header("pe_#{@obsid}", "galaxy", "gpuq", mins, num_nodes, output: "RTS-peel-#{@obsid}-%A.out")
         contents << "
+#{$rts_modules}
+
 aprun -n #{num_nodes} -N 1 #{@rts_path} #{ENV["USER"]}_rts_1.in
 "
 
