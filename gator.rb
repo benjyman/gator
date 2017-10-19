@@ -29,7 +29,8 @@ module load PrgEnv-gnu \\
             pyephem \\
             psycopg2 \\
             setuptools \\
-            matplotlib
+            matplotlib \\
+            h5py
 
 export LD_LIBRARY_PATH=/group/mwaops/CODE/lib:/lib64:/usr/lib64:${LD_LIBRARY_PATH}
 # For some stupid reason, \"module load cfitsio\" above does not put the appropriate library path in.
@@ -168,30 +169,6 @@ def flag_tiles
     bp_output.scan(/\(flag\s+(\d+)\?\)/).flatten.uniq.join("\n")
 end
 
-<<<<<<< HEAD
-#SBATCH --job-name=dl_#{obsid}
-#SBATCH --output=getNGASdata-#{obsid}-%A.out
-#SBATCH --ntasks=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --time=#{mins2hms(mins)}
-#SBATCH --clusters=zeus
-#SBATCH --partition=copyq
-<<<<<<< HEAD
-#SBATCH --account=mwasci
-======
-#SBATCH --account=#{$project}
->>>>>>> 13a28de3d05c2f5ae0acb9dfcf9c800f31acb13b
-#SBATCH --export=NONE
-
-module load pyephem
-module load setuptools
-cd #{$mwa_dir}/data
-obsdownload.py -o #{obsid} --chstart=1 --chcount=24
-obsdownload.py -o #{obsid} -f
-obsdownload.py -o #{obsid} -m
-#obsdownload2.py -o #{obsid} -u
-"
-=======
 def check_rts_status(path: ".")
     stdout_log = Dir.glob("#{path}/RTS*.out").sort_by { |l| File.mtime(l) }.last
 
@@ -211,7 +188,6 @@ def check_rts_status(path: ".")
         status = "???"
         final = "Error: Unable to set weighted average frequency. No unflagged channels"
     end
->>>>>>> 41a7553e9da9d88f1ccb63e965bba53f11d5c07f
 
     # Skip to the end if we already have a status.
     unless status
@@ -317,36 +293,6 @@ class Obsid
         end
     end
 
-<<<<<<< HEAD
-#SBATCH --job-name=se_#{obsid}
-#SBATCH --output=RTS-setup-#{obsid}-%A.out
-#SBATCH --ntasks=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --time=#{mins2hms(mins)}
-#SBATCH --partition=gpuq
-#SBATCH --account=#{$project}
-#SBATCH --export=NONE
-
-module switch PrgEnv-cray PrgEnv-gnu
-module unload gcc
-module load gcc/4.8.2
-module load cray-libsci
-module load cmake
-module load fftw/3.3.4.3
-module load scipy
-module load lapack
-module load cudatoolkit
-module load astropy
-module load cfitsio
-module load boost
-module load casacore
-module load ephem
-module load readline
-module load gsl
-
-module load pyephem
-module load setuptools
-=======
     def download(mins: 30)
         contents = generate_slurm_header("dl_#{@obsid}", "zeus", "copyq", mins, 1, output: "getNGASdata-#{@obsid}-%A.out")
         contents << "
@@ -427,7 +373,7 @@ obsdownload2.py -o #{@obsid} -u
             @obs_image_centre_dec = "-5.0"
             @source_list = "/group/mwaeor/bpindor/PUMA/srclists/srclist_puma-v2_complete.txt"
             @patch_source_catalogue_file = "#{@path}/srclist_puma-v2_complete_1186437224_patch1000_#{@obsid}_patch1000.txt"
-            @peel_source_catalogue_file = "/group/mwaeor/ctrott/srclist_puma-v2_complete_1186437224_peel1000.txt"
+            @peel_source_catalogue_file = "/group/mwaeor/ctrott/srclist_puma-v2_complete_1186437224_peel#{@peel_number}.txt"
             # @peel_source_catalogue_file = "/astro/mwaeor/cjordan/LymanA_puma-v2_1186437224_peel3000.txt"
 
             # High band
@@ -452,7 +398,16 @@ obsdownload2.py -o #{@obsid} -u
             @low_setup_jobid = @setup_jobid
             @low_patch_jobid = @patch_jobid
         else
-            abort(sprintf "Unknown grid name! (%s for %s)", @type, @obsid)
+            #abort(sprintf "Unknown grid name! (%s for %s)", @type, @obsid)
+            @obs_image_centre_ra = read_fits_key(Dir.glob("#{@path}/*metafits*").first, "RAPHASE")
+            @obs_image_centre_dec = read_fits_key(Dir.glob("#{@path}/*metafits*").first, "DECPHASE")
+            # my personnal pointers to the files. Should be made generic in the future - dynamic number of patch/peel source 
+            @source_list = "/group/mwasci/gdrouart/Softwares/srclists/srclist_puma-v3_complete.txt"
+            @patch_source_catalogue_file = "#{@path}/srclist_puma-v3_complete_#{@obsid}_patch1000.txt"
+            @peel_source_catalogue_file = "#{@path}/srclist_puma-v3_complete_#{@obsid}_peel3000.txt"
+            @subband_ids = (1..24).to_a.join(',')
+            rts_setup(mins: setup_mins)
+            rts_patch(mins: cal_mins, peel: peel) if patch            
         end
     end
 
@@ -460,35 +415,24 @@ obsdownload2.py -o #{@obsid} -u
         contents = generate_slurm_header("se_#{@obsid}", "galaxy", "gpuq", mins, 1, output: "RTS-setup-#{@obsid}-%A.out")
         contents << "
 #{$rts_modules}
->>>>>>> 41a7553e9da9d88f1ccb63e965bba53f11d5c07f
-
-module load pytz
-module load matplotlib
-module load healpy
-module load h5py
-
-export RTSDIR=$MWA_OPS_DIR/CODE/RTS
-export RTSBIN=$RTSDIR/bin
-
-export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$MWA_OPS_DIR/CODE/lib"
-export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$CRAY_LD_LIBRARY_PATH"
-
-export PATH="${PATH}:${MWA_OPS_DIR}/CODE/bin:$RTSBIN"
-
 
 list_gpubox_files.py obsid.dat
 ln -sf ../gpufiles_list.dat .
 
-generate_dynamic_RTS_sourcelists.py -n 1000 \\
+/group/mwasci/gdrouart/EOR_scripts/generate_dynamic_RTS_sourcelists.py -n 1000 \\
                                     --sourcelist=#{@source_list} \\
                                     --obslist=#{@path}/#{@timestamp_dir}/obsid.dat
+
+/group/mwasci/gdrouart/EOR_scripts/generate_dynamic_RTS_sourcelists.py -n 3000 \\
+                                    --sourcelist=#{@source_list} \\
+                                    --obslist=#{@path}/#{@timestamp_dir}/obsid.dat \\
+                                    --no_patch
 
 generate_mwac_qRTS_auto.py #{@path}/#{@timestamp_dir}/obsid.dat \\
                            #{ENV["USER"]} 24 \\
                            /group/mwaeor/bpindor/templates/EOR0_selfCalandPeel_PUMA1000_WriteUV_80khz_cotter_template.dat \\
                            --auto \\
                            --chunk_number=0 \\
-                           --channel_flags=/group/mwaeor/bpindor/templates/flagged_channels_default.txt \\
                            --dynamic_sourcelist=1000 \\
                            --sourcelist=#{@source_list}
 
