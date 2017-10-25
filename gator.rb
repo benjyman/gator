@@ -229,6 +229,7 @@ class Obsid
                 :low_setup_jobid,
                 :low_patch_jobid,
                 :low_peel_jobid,
+                :metafits,
                 :timestamp_dir,
                 :status,
                 :final,
@@ -245,6 +246,11 @@ class Obsid
         else
             @path = "#{$mwa_dir}/data/#{obsid}"
         end
+
+        @metafits = Dir.glob("#{@path}/*metafits*").sort_by { |f| File.size(f) }.last
+        abort("#{@obsid}: metafits file not found!") unless metafits
+
+        @int_time = read_fits_key(metafits, "INTTIME")
     end
 
     def fix_gpubox_timestamps
@@ -263,22 +269,13 @@ class Obsid
         end
     end
 
-    def integration_time
-        metafits = Dir.glob("#{@path}/*metafits*").sort_by { |f| File.size(f) }.last
-        abort("#{@obsid}: metafits file not found!") unless metafits
-        @int_time = read_fits_key(metafits, "INTTIME")
-    end
-
     def obs_type
-        metafits = Dir.glob("#{@path}/*metafits*").sort_by { |f| File.size(f) }.last
-        abort("#{@obsid}: metafits file not found!") unless metafits
-
         # Use the RAPHASE header tag wherever available.
         # EoR-specific fields.
-        if read_fits_key(metafits, "PROJECT").include? "G0009" or
-          read_fits_key(metafits, "GRIDNAME").include? "EOR" or
-          read_fits_key(metafits, "PROJECT").include? "D0000"
-            ra = read_fits_key(metafits, "RAPHASE").to_f
+        if read_fits_key(@metafits, "PROJECT").include? "G0009" or
+          read_fits_key(@metafits, "GRIDNAME").include? "EOR" or
+          read_fits_key(@metafits, "PROJECT").include? "D0000"
+            ra = read_fits_key(@metafits, "RAPHASE").to_f
             if ra.close_to?(0, tol=3)
                 @type = "EOR0"
             elsif ra.close_to?(60, tol=3)
