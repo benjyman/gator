@@ -370,7 +370,7 @@ obsdownload2.py -o #{@obsid} -u
             @obs_image_centre_dec = "-5.0"
             @source_list = "/group/mwaeor/bpindor/PUMA/srclists/srclist_puma-v2_complete.txt"
             @patch_source_catalogue_file = "#{@path}/srclist_puma-v2_complete_1186437224_patch1000_#{@obsid}_patch1000.txt"
-            @peel_source_catalogue_file = "/group/mwaeor/ctrott/srclist_puma-v2_complete_1186437224_peel#{@peel_number}.txt"
+            @peel_source_catalogue_file = "/group/mwaeor/ctrott/srclist_puma-v2_complete_1186437224_peel3000.txt"
             # @peel_source_catalogue_file = "/astro/mwaeor/cjordan/LymanA_puma-v2_1186437224_peel3000.txt"
 
             # High band
@@ -396,12 +396,12 @@ obsdownload2.py -o #{@obsid} -u
             @low_patch_jobid = @patch_jobid
         else
             #abort(sprintf "Unknown grid name! (%s for %s)", @type, @obsid)
-            @obs_image_centre_ra = read_fits_key(Dir.glob("#{@path}/*metafits*").first, "RAPHASE")
-            @obs_image_centre_dec = read_fits_key(Dir.glob("#{@path}/*metafits*").first, "DECPHASE")
+            @obs_image_centre_ra = read_fits_key(@metafits, "RAPHASE")
+            @obs_image_centre_dec = read_fits_key(@metafits, "DECPHASE")
             # my personnal pointers to the files. Should be made generic in the future - dynamic number of patch/peel source 
             @source_list = "/group/mwasci/gdrouart/Softwares/srclists/srclist_puma-v3_complete.txt"
-            @patch_source_catalogue_file = "#{@path}/srclist_puma-v3_complete_#{@obsid}_patch1000.txt"
-            @peel_source_catalogue_file = "#{@path}/srclist_puma-v3_complete_#{@obsid}_peel3000.txt"
+            @patch_source_catalogue_file = "#{@path}/#{@timestamp_dir}/srclist_puma-v3_complete_#{@obsid}_patch1000.txt"
+            @peel_source_catalogue_file = "#{@path}/#{@timestamp_dir}/srclist_puma-v3_complete_#{@obsid}_peel3000.txt"
             @subband_ids = (1..24).to_a.join(',')
             rts_setup(mins: setup_mins)
             rts_patch(mins: cal_mins, peel: peel) if patch            
@@ -416,15 +416,22 @@ obsdownload2.py -o #{@obsid} -u
 list_gpubox_files.py obsid.dat
 ln -sf ../gpufiles_list.dat .
 
-/group/mwasci/gdrouart/EOR_scripts/generate_dynamic_RTS_sourcelists.py -n 1000 \\
-                                    --sourcelist=#{@source_list} \\
-                                    --obslist=#{@path}/#{@timestamp_dir}/obsid.dat
+#####
+# new way / getting rid off the wrapper generate_dynamic_RTS_sourcelists.py
+#
+# two commands feeding directly srclist_by_beam.py to pick randomly sources and attenuate them 
+# by the beam. one to feed the patch (calibrate data) and one to feed in peel (peel sources from data) 
+#####
+srclist_by_beam.py -n 1000 --srclist=#{@source_list} --metafits=#{@metafits} --order=\"distance\"
+"
+        contents << "
+srclist_by_beam.py -n 3000 --srclist=#{@source_list} --metafits=#{@metafits} --order=\"distance\" --no_patch --cutoff=30
+" if $peel
+        contents << "
+#####
 
-/group/mwasci/gdrouart/EOR_scripts/generate_dynamic_RTS_sourcelists.py -n 3000 \\
-                                    --sourcelist=#{@source_list} \\
-                                    --obslist=#{@path}/#{@timestamp_dir}/obsid.dat \\
-                                    --no_patch
-
+#####
+# generate the rts_patch.sh file - to many options and stuff. should be more like rts_setup! 
 generate_mwac_qRTS_auto.py #{@path}/#{@timestamp_dir}/obsid.dat \\
                            #{ENV["USER"]} 24 \\
                            /group/mwaeor/bpindor/templates/EOR0_selfCalandPeel_PUMA1000_WriteUV_80khz_cotter_template.dat \\
@@ -432,9 +439,12 @@ generate_mwac_qRTS_auto.py #{@path}/#{@timestamp_dir}/obsid.dat \\
                            --chunk_number=0 \\
                            --dynamic_sourcelist=1000 \\
                            --sourcelist=#{@source_list}
+#####
 
 reflag_mwaf_files.py #{@path}/#{@timestamp_dir}/obsid.dat
 
+##### 
+# the following should be replaced by a template generation function from metafits header.
 generate_RTS_in_mwac.py #{@path} \\
                         #{ENV["USER"]} 24 128T \\
                         --templates=/group/mwaeor/bpindor/templates/EOR0_selfCalandPeel_PUMA1000_WriteUV_80khz_cotter_template.dat \\
