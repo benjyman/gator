@@ -49,25 +49,19 @@ begin
             elsif status == "downloading"
                 jobid = r["JobID"]
                 unless jobs_in_queue.include? jobid
-                    begin
-                        stdout = File.read("#{ENV["MWA_DIR"].chomp('/')}/data/#{obsid}/getNGASdata-#{obsid}-#{jobid}.out")
-                        # If the download was successful...
-                        if stdout.scan(/File Transfer Success/).count == 1
-                            # ... update the table to say so.
-                            status = "downloaded"
-                        # If the download was not successful...
-                        else
-                            # ... label as 'failed', and a download will be tried again later.
-                            status = "failed"
-                        end
-
-                        last_line = stdout.split("\n").last
-                        puts "#{obsid}: #{last_line}"
-                    rescue
-                        # Something went wrong - assume we failed.
+                    stdout = File.read("#{ENV["MWA_DIR"].chomp('/')}/data/#{obsid}/getNGASdata-#{obsid}-#{jobid}.out")
+                    # If the download was successful...
+                    if stdout.scan(/File Transfer Success/).count == 1
+                        # ... update the table to say so.
+                        status = "downloaded"
+                    # If the download was not successful...
+                    else
+                        # ... label as 'failed', and a download will be tried again later.
                         status = "failed"
-                        last_line = ""
                     end
+
+                    last_line = stdout.split("\n").last
+                    puts "#{obsid}: #{last_line}"
                     db.execute("UPDATE #{table_name}
                                 SET LastChecked = '#{Time.now}',
                                     Stdout = '#{last_line.gsub('\'', "")}',
@@ -99,18 +93,19 @@ begin
                 len_queue += 1
             end
 
-            # Check the status of all obsids - have they all been downloaded? If so, exit.
-            num_not_downloaded = db.execute("SELECT * FROM #{table_name} WHERE NOT Status = 'downloaded'").length
-            if num_not_downloaded == 0
-                puts "\nJobs done."
-                exit
-            else
-                puts "Number of obsids not yet downloaded: #{num_not_downloaded}"
-            end
-
-            puts "Sleeping...\n\n"
-            sleep $sleep_time
         end
+
+        # Check the status of all obsids - have they all been downloaded? If so, exit.
+        num_not_downloaded = db.execute("SELECT * FROM #{table_name} WHERE NOT Status = 'downloaded'").length
+        if num_not_downloaded == 0
+            puts "\nJobs done."
+            exit
+        else
+            puts "Number of obsids not yet downloaded: #{num_not_downloaded}"
+        end
+
+        puts "Sleeping...\n\n"
+        sleep $sleep_time
     end
 
 rescue SQLite3::Exception => e
