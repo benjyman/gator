@@ -147,7 +147,7 @@ begin
                                     SetupJobID = #{o.setup_jobid},
                                     RTSJobID = #{o.patch_jobid},
                                     LastChecked = '#{Time.now}'
-                                WHERE Path = '#{path}'")
+                                WHERE Obsid = #{obsid} AND Path = '#{path}'")
                     len_queue += 2
                 end
             end
