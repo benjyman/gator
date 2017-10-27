@@ -416,12 +416,14 @@ ln -sf ../gpufiles_list.dat .
 # two commands feeding directly srclist_by_beam.py to pick randomly sources and attenuate them 
 # by the beam. one to feed the patch (calibrate data) and one to feed in peel (peel sources from data) 
 #####
+echo \"\nRunning srclist_by_beam.py for a patch source list.\"
 srclist_by_beam.py -n 1000 \\
                    --srclist=#{@source_list} \\
                    --metafits=#{@metafits} \\
                    --order=\"distance\"
 "
         contents << "
+echo \"\nRunning srclist_by_beam.py for a peel source list.\"
 srclist_by_beam.py -n 3000 \\
                    --srclist=#{@source_list} \\
                    --metafits=#{@metafits} \\
@@ -434,6 +436,7 @@ srclist_by_beam.py -n 3000 \\
 
 #####
 # generate the rts_patch.sh file - to many options and stuff. should be more like rts_setup! 
+echo \"\nRunning generate_mwac_qRTS_auto.py\"
 generate_mwac_qRTS_auto.py #{@path}/#{@timestamp_dir}/obsid.dat \\
                            #{ENV["USER"]} 24 \\
                            /group/mwaeor/bpindor/templates/EOR0_selfCalandPeel_PUMA1000_WriteUV_80khz_cotter_template.dat \\
@@ -443,10 +446,12 @@ generate_mwac_qRTS_auto.py #{@path}/#{@timestamp_dir}/obsid.dat \\
                            --sourcelist=#{@source_list}
 #####
 
+echo \"\nRunning reflag_mwaf_files.py\"
 reflag_mwaf_files.py #{@path}/#{@timestamp_dir}/obsid.dat
 
 ##### 
 # the following should be replaced by a template generation function from metafits header.
+echo \"\nRunning generate_RTS_in_mwac.py\"
 generate_RTS_in_mwac.py #{@path} \\
                         #{ENV["USER"]} 24 128T \\
                         --templates=/group/mwaeor/bpindor/templates/EOR0_selfCalandPeel_PUMA1000_WriteUV_80khz_cotter_template.dat \\
@@ -496,13 +501,23 @@ sed -i \"s|\\(ObservationFrequencyBase=\\).*|\\1#{@obs_freq_base}|\" #{ENV["USER
         contents << "
 #{$rts_modules}
 
+echo \"\nRunning RTS patch\"
 aprun -n #{num_nodes} -N 1 #{@rts_path} #{ENV["USER"]}_rts_0.in
+
+echo \"\nRunning plot_BPcal_128T.py\"
 /group/mwaeor/cjordan/Software/plot_BPcal_128T.py
+
+echo \"\nRunning plot_CalSols.py\"
 /group/mwaeor/cjordan/Software/plot_CalSols.py --base_dir=`pwd` -n #{@obsid} -i
 touch flagged_tiles.txt
+
+echo \"\nRunning RTS patch\"
 aprun -n #{num_nodes} -N 1 #{@rts_path} #{ENV["USER"]}_rts_0.in
 "
-        contents << "aprun -n #{num_nodes} -N 1 #{@rts_path} #{ENV["USER"]}_rts_1.in\n" if peel
+        if peel
+            contents << "echo \"\nRunning RTS peel\"
+aprun -n #{num_nodes} -N 1 #{@rts_path} #{ENV["USER"]}_rts_1.in\n"
+        end
 
         Dir.chdir "#{@path}/#{@timestamp_dir}" unless Dir.pwd == "#{@path}/#{@timestamp_dir}"
         write(filename, contents)
