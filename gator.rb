@@ -271,20 +271,23 @@ class Obsid
 
     def obs_type
         # Use the RAPHASE header tag wherever available.
+        ra = read_fits_key(@metafits, "RAPHASE").to_f
+        filename = read_fits_key(@metafits, "FILENAME")
+
         # EoR-specific fields.
         if read_fits_key(@metafits, "PROJECT").include? "G0009" or
           read_fits_key(@metafits, "GRIDNAME").include? "EOR" or
           read_fits_key(@metafits, "PROJECT").include? "D0000"
-            ra = read_fits_key(@metafits, "RAPHASE").to_f
             if ra.close_to?(0, tol=3)
                 @type = "EOR0"
             elsif ra.close_to?(60, tol=3)
                 @type = "EOR1"
-            elsif ra.close_to?(30, tol=5)
+            elsif filename.include? "LymanA"
                 @type = "LymanA"
             else
                 @type = "RA=#{ra}"
             end
+        # Everything else.
         else
             @type = "RA=#{ra}"
         end
@@ -317,14 +320,18 @@ obsdownload2.py -o #{@obsid} -u
         @peel_number = peel_number
         @rts_path = rts_path
 
-        # Older data
         if @int_time == "0.5"
             @corr_dumps_per_cadence_cal = 128
             @number_of_integration_bins_cal = 7
 
             @corr_dumps_per_cadence_peel = 16
             @number_of_integration_bins_peel = 5
-        # Newer data
+        elsif @int_time == "1.0"
+            @corr_dumps_per_cadence_cal = 64
+            @number_of_integration_bins_cal = 7
+
+            @corr_dumps_per_cadence_peel = 8
+            @number_of_integration_bins_peel = 3
         elsif @int_time == "2.0"
             @corr_dumps_per_cadence_cal = 32
             @number_of_integration_bins_cal = 6
@@ -344,41 +351,32 @@ obsdownload2.py -o #{@obsid} -u
             @timestamp_dir = ""
         end
 
+        # Depending on your project, we point to a specific master source list file.
+        if $project == "mwasci"
+            @source_list = "/group/mwasci/gdrouart/Softwares/srclists/srclist_puma-v3_complete.txt"
+        elsif $project == "mwaeor"
+            @source_list = "/group/mwaeor/cjordan/srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt"
+        end
+        source_list_prefix = @source_list.split('/').last.split(".txt").first
+        @patch_source_catalogue_file = "#{@path}/#{timestamp_dir}/#{source_list_prefix}_#{@obsid}_patch1000.txt"
+        @peel_source_catalogue_file = "#{@path}/#{timestamp_dir}/#{source_list_prefix}_#{@obsid}_peel3000.txt"
+
+        # The RA needs to be in an hour angle format.
+        @obs_image_centre_ra = (read_fits_key(@metafits, "RAPHASE").to_f / 15.0).to_s
+        @obs_image_centre_dec = read_fits_key(@metafits, "DECPHASE")
+
+        # Run the "obs_type" function if the "type" attribute doesn't exist.
         obs_type unless @type
-        if @type == "EOR0"
-            @obs_image_centre_ra = "0."
-            @obs_image_centre_dec = "-27.0"
-            @source_list = "/group/mwaeor/bpindor/PUMA/srclists/srclist_puma-v2_complete.txt"
-            @patch_source_catalogue_file = "#{$mwa_dir}/data/#{@obsid}/srclist_puma-v2_complete_#{@obsid}_patch1000.txt"
-            @peel_source_catalogue_file = "/group/mwaeor/bpindor/PUMA/srclists/srclist_puma-v2_complete_1061316296_peel3000.txt"
-            @subband_ids = (1..24).to_a.join(',')
-
-            rts_setup(mins: setup_mins)
-            rts_patch(mins: cal_mins, peel: peel) if patch
-        elsif @type == "EOR1"
-            @obs_image_centre_ra = "4.0"
-            @obs_image_centre_dec = "-30.0"
-            @source_list = "/group/mwaeor/bpindor/PUMA/srclists/srclist_pumaIDR4_EoR1-ext-only+ForA-shap.txt"
-            @patch_source_catalogue_file = "#{$mwa_dir}/data/#{@obsid}/srclist_pumaIDR4_EoR1-ext-only+ForA-shap_#{@obsid}_patch1000.txt"
-            @peel_source_catalogue_file = "/group/mwaeor/bpindor/PUMA/srclists/srclist_pumaIDR4_EoR1-ext-only+ForA-shap_1062364544_peel3000.txt"
-            @subband_ids = (1..24).to_a.join(',')
-
-            rts_setup(mins: setup_mins)
-            rts_patch(mins: cal_mins, peel: peel) if patch
-        elsif @type == "LymanA"
-            @obs_image_centre_ra = "2.283"
-            @obs_image_centre_dec = "-5.0"
-            @source_list = "/group/mwaeor/bpindor/PUMA/srclists/srclist_puma-v2_complete.txt"
-            @patch_source_catalogue_file = "#{@path}/srclist_puma-v2_complete_1186437224_patch1000_#{@obsid}_patch1000.txt"
-            @peel_source_catalogue_file = "/group/mwaeor/ctrott/srclist_puma-v2_complete_1186437224_peel3000.txt"
-            # @peel_source_catalogue_file = "/astro/mwaeor/cjordan/LymanA_puma-v2_1186437224_peel3000.txt"
-
+        # Here, we handle special observations. If the current "type" isn't listed here, it gets processed generically.
+        if @type == "LymanA"
             # High band
             # Frequency of channel 24, if all bands were contiguous (identical here, i.e. channel 142)
             # This frequency is actually about half a channel lower in frequency, i.e. 141.49609*1.28MHz
             @obs_freq_base = 181.135
             @subband_ids = (17..24).to_a.join(',')
             @timestamp_dir << "_high"
+            @patch_source_catalogue_file = "#{@path}/#{timestamp_dir}/#{source_list_prefix}_#{@obsid}_patch1000.txt"
+            @peel_source_catalogue_file = "#{@path}/#{timestamp_dir}/#{source_list_prefix}_#{@obsid}_peel3000.txt"
             rts_setup(mins: setup_mins)
             rts_patch(mins: cal_mins, peel: peel) if patch
             @high_setup_jobid = @setup_jobid
@@ -390,18 +388,14 @@ obsdownload2.py -o #{@obsid} -u
             @obs_freq_base = 191.355
             @subband_ids = (1..16).to_a.join(',')
             @timestamp_dir = @timestamp_dir.split('_').select { |e| e =~ /\d/ }.join('_') << "_low"
+            @patch_source_catalogue_file = "#{@path}/#{timestamp_dir}/#{source_list_prefix}_#{@obsid}_patch1000.txt"
+            @peel_source_catalogue_file = "#{@path}/#{timestamp_dir}/#{source_list_prefix}_#{@obsid}_peel3000.txt"
             rts_setup(mins: setup_mins)
             rts_patch(mins: cal_mins, peel: peel) if patch
             @low_setup_jobid = @setup_jobid
             @low_patch_jobid = @patch_jobid
         else
-            #abort(sprintf "Unknown grid name! (%s for %s)", @type, @obsid)
-            @obs_image_centre_ra = read_fits_key(@metafits, "RAPHASE")
-            @obs_image_centre_dec = read_fits_key(@metafits, "DECPHASE")
-            # my personnal pointers to the files. Should be made generic in the future - dynamic number of patch/peel source 
-            @source_list = "/group/mwasci/gdrouart/Softwares/srclists/srclist_puma-v3_complete.txt"
-            @patch_source_catalogue_file = "#{@path}/#{@timestamp_dir}/srclist_puma-v3_complete_#{@obsid}_patch1000.txt"
-            @peel_source_catalogue_file = "#{@path}/#{@timestamp_dir}/srclist_puma-v3_complete_#{@obsid}_peel3000.txt"
+            # This is for all other "non-special" fields, including EoR fields.
             @subband_ids = (1..24).to_a.join(',')
             rts_setup(mins: setup_mins)
             rts_patch(mins: cal_mins, peel: peel) if patch            
@@ -422,10 +416,18 @@ ln -sf ../gpufiles_list.dat .
 # two commands feeding directly srclist_by_beam.py to pick randomly sources and attenuate them 
 # by the beam. one to feed the patch (calibrate data) and one to feed in peel (peel sources from data) 
 #####
-srclist_by_beam.py -n 1000 --srclist=#{@source_list} --metafits=#{@metafits} --order=\"distance\"
+srclist_by_beam.py -n 1000 \\
+                   --srclist=#{@source_list} \\
+                   --metafits=#{@metafits} \\
+                   --order=\"distance\"
 "
         contents << "
-srclist_by_beam.py -n 3000 --srclist=#{@source_list} --metafits=#{@metafits} --order=\"distance\" --no_patch --cutoff=30
+srclist_by_beam.py -n 3000 \\
+                   --srclist=#{@source_list} \\
+                   --metafits=#{@metafits} \\
+                   --order=\"distance\" \\
+                   --no_patch \\
+                   --cutoff=30
 " if $peel
         contents << "
 #####
