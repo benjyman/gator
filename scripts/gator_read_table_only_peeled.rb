@@ -3,7 +3,6 @@
 require "sqlite3"
 require "optparse"
 
-options = {}
 OptionParser.new do |opts|
     opts.banner = "Usage: #{__FILE__} [-d /path/to/database]\nDisplay the contents of a database."
     opts.on("-h", "--help", "Display this message.") {puts opts; exit}
@@ -22,7 +21,7 @@ begin
 
     db.execute("select * from #{table_name}") do |r|
         if r["Status"] == "peeled"
-            puts "#{r["Obsid"]}/#{r["Timestamp"]}"
+            puts r["Path"]
         end
     end
 
