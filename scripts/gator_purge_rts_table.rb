@@ -17,6 +17,9 @@ OptionParser.new do |opts|
 
     $database = "#{ENV["MYGROUP"]}/rts.sqlite"
 	opts.on("-d", "--database DATABASE", "Specify the database to be used. Default: #{$database}") {|o| $database = o}
+
+    $purge_all = false
+	opts.on("-a", "--all", "Purge all rows of the table, even if they've been peeled. Default: #{$database}") {|o| $purge_all = true}
 end.parse!
 
 
@@ -31,8 +34,8 @@ db.execute("SELECT * FROM #{table_name}") do |r|
     path = r["Path"]
     status = r["Status"]
 
-    if status != "peeled" and status != "unqueued"
-        FileUtils.rm_r path
+    if $purge_all or (status != "peeled" and status != "unqueued")
+        FileUtils.rm_r path unless path.strip.empty?
         db.execute("UPDATE #{table_name}
                     SET Path = ' ',
                         Status = 'unqueued',
