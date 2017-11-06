@@ -26,7 +26,7 @@ begin
     db.results_as_hash = true
 
     count = 0
-    db.execute("select * from #{table_name}") do |r|
+    db.execute("SELECT * FROM #{table_name}") do |r|
         if options[:verbose]
             puts r
         else
