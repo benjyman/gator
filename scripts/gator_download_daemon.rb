@@ -61,6 +61,8 @@ begin
                     end
 
                     last_line = stdout.split("\n").last
+                    # Deal with pesky single quotes by nuking them.
+                    last_line.gsub!('\'', "") if last_line
                     puts "#{obsid}: #{last_line}"
                     db.execute("UPDATE #{table_name}
                                 SET LastChecked = '#{Time.now}',
