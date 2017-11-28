@@ -38,13 +38,13 @@ export LD_LIBRARY_PATH=/pawsey/cle52up04/devel/PrgEnv-gnu/5.2.82/gcc/4.8.2/ivybr
 "
 
 class Float
-    def close_to?(n, tol=0.1)
+    def close_to?(n, tol: 0.1)
         (self - n).abs < tol
     end
 end
 
 
-def get_queue(machine, user)
+def get_queue(machine:, user:)
     queue = `squeue -M #{machine} -u #{user} 2>&1`
     # Sometimes the queue system needs a little time to think.
     while queue =~ /error/
@@ -76,7 +76,7 @@ def mins2hms(mins)
     "%02d:%02d:%02d" % [t/86400*24 + t/3600%24, t/60%60, t%60]
 end
 
-def write(file, contents)
+def write(file:, contents:)
     begin
         File.open(file, 'w') { |f| f.puts contents }
     rescue
@@ -108,7 +108,7 @@ def obtain_obsids(argv)
     obsids
 end
 
-def read_fits_key(fits, key)
+def read_fits_key(fits:, key:)
     match = File.open(fits, 'r') { |f| f.read(10000).match(/#{key}\s*=\s*(\S+)/) }
     begin
         return match[1]
@@ -118,7 +118,7 @@ def read_fits_key(fits, key)
     end
 end
 
-def alter_config(text, key, value)
+def alter_config(text:, key:, value:)
     # Comments come as two forward slashes (i.e. //)
     # before a key value.
     results = text.scan(/(..)?(#{key}.*\n)/)
@@ -135,13 +135,8 @@ def alter_config(text, key, value)
     text.sub!(results.last.join(''), "#{key}=#{value}\n")
 end
 
-def generate_slurm_header(job_name, machine, partition, mins, nodes, ntasks_per_node: 1, output: nil)
-    stdout = if output
-                 output
-             else
-                 "#{job_name}-%A.out" unless output
-             end
-
+def generate_slurm_header(job_name:, machine:, partition:, mins:, nodes:, ntasks_per_node: 1, output: nil)
+    stdout = output ? output : "#{job_name}-%A.out"
     return \
 "#!/bin/bash
 #SBATCH --job-name=#{job_name}
@@ -200,12 +195,7 @@ def check_rts_status(path: ".")
             # Read the last line of the log.
             final = File.readlines(node_log).last.strip
             if final =~ /LogDone. Closing file/
-                # Check the file size. Big enough -> peeled. Too small -> patched.
-                if File.stat(node_log).size > 10000000
-                    status = "peeled"
-                else
-                    status = "patched"
-                end
+                status = "peeled"
             else
                 status = "failed"
             end
@@ -248,9 +238,6 @@ class Obsid
         end
 
         @metafits = Dir.glob("#{@path}/*metafits*").sort_by { |f| File.size(f) }.last
-        abort("#{@obsid}: metafits file not found!") unless metafits
-
-        @int_time = read_fits_key(metafits, "INTTIME")
     end
 
     def fix_gpubox_timestamps
@@ -271,16 +258,16 @@ class Obsid
 
     def obs_type
         # Use the RAPHASE header tag wherever available.
-        ra = read_fits_key(@metafits, "RAPHASE").to_f
-        filename = read_fits_key(@metafits, "FILENAME")
+        ra = read_fits_key(fits: @metafits, key: "RAPHASE").to_f
+        filename = read_fits_key(fits: @metafits, key: "FILENAME")
 
         # EoR-specific fields.
-        if read_fits_key(@metafits, "PROJECT").include? "G0009" or
-          read_fits_key(@metafits, "GRIDNAME").include? "EOR" or
-          read_fits_key(@metafits, "PROJECT").include? "D0000"
-            if ra.close_to?(0, tol=3)
+        if read_fits_key(fits: @metafits, key: "PROJECT").include? "G0009" or
+          read_fits_key(fits: @metafits, key: "GRIDNAME").include? "EOR" or
+          read_fits_key(fits: @metafits, key: "PROJECT").include? "D0000"
+            if ra.close_to?(0, tol: 5) or ra.close_to?(360, tol: 5)
                 @type = "EOR0"
-            elsif ra.close_to?(60, tol=3)
+            elsif ra.close_to?(60, tol: 5)
                 @type = "EOR1"
             elsif filename.include? "LymanA"
                 @type = "LymanA"
@@ -294,29 +281,36 @@ class Obsid
     end
 
     def download(mins: 30)
-        contents = generate_slurm_header("dl_#{@obsid}", "zeus", "copyq", mins, 1, output: "getNGASdata-#{@obsid}-%A.out")
+        contents = generate_slurm_header(job_name: "dl_#{@obsid}",
+                                         machine: "zeus",
+                                         partition: "copyq",
+                                         mins: mins,
+                                         nodes: 1,
+                                         output: "getNGASdata-#{@obsid}-%A.out")
         contents << "
 #{$download_modules}
 
 cd #{$mwa_dir}/data
-# obsdownload.py -o #{@obsid} --chstart=1 --chcount=24
-# obsdownload.py -o #{@obsid} -f
-# obsdownload.py -o #{@obsid} -m
-obsdownload2.py -o #{@obsid} -u
+obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
 "
 
         FileUtils.mkdir_p @path unless Dir.pwd == @path
         Dir.chdir @path unless Dir.pwd == @path
-        write("#{@obsid}.sh", contents)
+        write(file: "#{@obsid}.sh", contents: contents)
         @download_jobid = sbatch("#{@obsid}.sh").match(/Submitted batch job (\d+)/)[1].to_i
     end
 
     def rts(setup_mins: 5, cal_mins: 40, patch: true, peel: true, peel_number: 1000, timestamp: true, rts_path: "/group/mwaeor/CODE/RTS/bin/rts_gpu")
-        if $peel and not $patch
+        if peel and not patch
             abort "Cannot peel if we are not patching; exiting."
         end
+        @patch = patch
+        @peel = peel
 
-        integration_time unless @int_time
+        @metafits = Dir.glob("#{@path}/*metafits*").sort_by { |f| File.size(f) }.last
+        abort("#{@obsid}: metafits file not found!") unless metafits
+        @int_time = read_fits_key(fits: metafits, key: "INTTIME")
+
         @peel_number = peel_number
         @rts_path = rts_path
 
@@ -362,8 +356,8 @@ obsdownload2.py -o #{@obsid} -u
         @peel_source_catalogue_file = "#{@path}/#{timestamp_dir}/#{source_list_prefix}_#{@obsid}_peel3000.txt"
 
         # The RA needs to be in an hour angle format.
-        @obs_image_centre_ra = (read_fits_key(@metafits, "RAPHASE").to_f / 15.0).to_s
-        @obs_image_centre_dec = read_fits_key(@metafits, "DECPHASE")
+        @obs_image_centre_ra = (read_fits_key(fits: @metafits, key: "RAPHASE").to_f / 15.0).to_s
+        @obs_image_centre_dec = read_fits_key(fits: @metafits, key: "DECPHASE")
 
         # Run the "obs_type" function if the "type" attribute doesn't exist.
         obs_type unless @type
@@ -378,7 +372,7 @@ obsdownload2.py -o #{@obsid} -u
             @patch_source_catalogue_file = "#{@path}/#{timestamp_dir}/#{source_list_prefix}_#{@obsid}_patch1000.txt"
             @peel_source_catalogue_file = "#{@path}/#{timestamp_dir}/#{source_list_prefix}_#{@obsid}_peel3000.txt"
             rts_setup(mins: setup_mins)
-            rts_patch(mins: cal_mins, peel: peel) if patch
+            rts_patch(mins: cal_mins, peel: @peel) if @patch
             @high_setup_jobid = @setup_jobid
             @high_patch_jobid = @patch_jobid
 
@@ -391,19 +385,24 @@ obsdownload2.py -o #{@obsid} -u
             @patch_source_catalogue_file = "#{@path}/#{timestamp_dir}/#{source_list_prefix}_#{@obsid}_patch1000.txt"
             @peel_source_catalogue_file = "#{@path}/#{timestamp_dir}/#{source_list_prefix}_#{@obsid}_peel3000.txt"
             rts_setup(mins: setup_mins)
-            rts_patch(mins: cal_mins, peel: peel) if patch
+            rts_patch(mins: cal_mins, peel: @peel) if @patch
             @low_setup_jobid = @setup_jobid
             @low_patch_jobid = @patch_jobid
         else
             # This is for all other "non-special" fields, including EoR fields.
             @subband_ids = (1..24).to_a.join(',')
             rts_setup(mins: setup_mins)
-            rts_patch(mins: cal_mins, peel: peel) if patch            
+            rts_patch(mins: cal_mins, peel: @peel) if @patch
         end
     end
 
     def rts_setup(mins: 5)
-        contents = generate_slurm_header("se_#{@obsid}", "galaxy", "gpuq", mins, 1, output: "RTS-setup-#{@obsid}-%A.out")
+        contents = generate_slurm_header(job_name: "se_#{@obsid}",
+                                         machine: "galaxy",
+                                         partition: "gpuq",
+                                         mins: mins,
+                                         nodes: 1,
+                                         output: "RTS-setup-#{@obsid}-%A.out")
         contents << "
 #{$rts_modules}
 
@@ -430,7 +429,7 @@ srclist_by_beam.py -n 3000 \\
                    --order=\"distance\" \\
                    --no_patch \\
                    --cutoff=30
-" if $peel
+" if @peel
         contents << "
 #####
 
@@ -488,16 +487,23 @@ sed -i \"s|\\(ObservationFrequencyBase=\\).*|\\1#{@obs_freq_base}|\" #{ENV["USER
         FileUtils.mkdir_p @timestamp_dir
         Dir.chdir @timestamp_dir
         system("ln -sf ../*metafits_ppds.fits .")
-        write("obsid.dat", @obsid)
-        write("rts_setup.sh", contents)
+        write(file: "obsid.dat", contents: @obsid)
+        write(file: "rts_setup.sh", contents: contents)
         @setup_jobid = sbatch("rts_setup.sh").match(/Submitted batch job (\d+)/)[1].to_i
     end
 
     def rts_patch(mins: 15, peel: false)
+        # Peel is allowed to be redefined here for more flexibility.
+
         num_nodes = @subband_ids.split(',').length + 1
 
         filename = "rts_patch.sh"
-        contents = generate_slurm_header("pa_#{@obsid}", "galaxy", "gpuq", mins, num_nodes, output: "RTS-patch-#{@obsid}-%A.out")
+        contents = generate_slurm_header(job_name: "pa_#{@obsid}",
+                                         machine: "galaxy",
+                                         partition: "gpuq",
+                                         mins: mins,
+                                         nodes: num_nodes,
+                                         output: "RTS-patch-#{@obsid}-%A.out")
         contents << "
 #{$rts_modules}
 
@@ -520,8 +526,8 @@ aprun -n #{num_nodes} -N 1 #{@rts_path} #{ENV["USER"]}_rts_1.in\n"
         end
 
         Dir.chdir "#{@path}/#{@timestamp_dir}" unless Dir.pwd == "#{@path}/#{@timestamp_dir}"
-        write(filename, contents)
-        write("rts_version_used.txt", rts_version(@rts_path))
+        write(file: filename, contents: contents)
+        write(file: "rts_version_used.txt", contents: rts_version(@rts_path))
         @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{filename}").match(/Submitted batch job (\d+)/)[1].to_i
     end
 
@@ -529,7 +535,12 @@ aprun -n #{num_nodes} -N 1 #{@rts_path} #{ENV["USER"]}_rts_1.in\n"
         num_nodes = @subband_ids.split(',').length + 1
 
         filename = "rts_peel.sh"
-        contents = generate_slurm_header("pe_#{@obsid}", "galaxy", "gpuq", mins, num_nodes, output: "RTS-peel-#{@obsid}-%A.out")
+        contents = generate_slurm_header(job_name: "pe_#{@obsid}",
+                                         machine: "galaxy",
+                                         partition: "gpuq",
+                                         mins: mins,
+                                         nodes: num_nodes,
+                                         output: "RTS-peel-#{@obsid}-%A.out")
         contents << "
 #{$rts_modules}
 
@@ -537,7 +548,7 @@ aprun -n #{num_nodes} -N 1 #{@rts_path} #{ENV["USER"]}_rts_1.in
 "
 
         Dir.chdir "#{@path}/#{@timestamp_dir}" unless Dir.pwd == "#{@path}/#{@timestamp_dir}"
-        write(filename, contents)
+        write(file: filename, contents: contents)
         @peel_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{filename}").match(/Submitted batch job (\d+)/)[1].to_i
     end
 

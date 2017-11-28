@@ -31,7 +31,7 @@ db.results_as_hash = true
 # Add specified obsids.
 # Some intelligent code here could determine if the obsid has already been downloaded.
 # Hash?
-obsids_in_table = db.execute("select * from #{table_name}").map {|r| r[0]}
+obsids_in_table = db.execute("SELECT * FROM #{table_name}").map {|r| r[0]}
 obtain_obsids(ARGV).each do |o|
     if obsids_in_table.include? o
         puts "Already in database: #{o}"
