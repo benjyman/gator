@@ -240,22 +240,6 @@ class Obsid
         @metafits = Dir.glob("#{@path}/*metafits*").sort_by { |f| File.size(f) }.last
     end
 
-    def fix_gpubox_timestamps
-        # Fix the "off by one" gpubox files by symlinking the offenders
-        Dir.chdir @path unless Dir.pwd == @path
-        gpubox_files = Dir.glob("*gpubox*")
-        odd = gpubox_files.select { |f| f.to_i.odd? }
-        return if odd.empty?
-        even = gpubox_files.select { |f| f.to_i.even? }
-        return if even.empty?
-
-        proper_timestamp = gpubox_files.select { |f| f.to_i.even? }.first.split('_')[1]
-        odd.each do |f|
-            a, _, *c = f.split('_')
-            system("ln -sf #{f} #{[a, proper_timestamp, c].join('_')}")
-        end
-    end
-
     def obs_type
         # Use the RAPHASE header tag wherever available.
         ra = read_fits_key(fits: @metafits, key: "RAPHASE").to_f
@@ -483,7 +467,6 @@ sed -i \"s|\\(ObservationFrequencyBase=\\).*|\\1#{@obs_freq_base}|\" #{ENV["USER
 " if @obs_freq_base
         
         Dir.chdir @path unless Dir.pwd == @path
-        fix_gpubox_timestamps
         FileUtils.mkdir_p @timestamp_dir
         Dir.chdir @timestamp_dir
         system("ln -sf ../*metafits_ppds.fits .")
