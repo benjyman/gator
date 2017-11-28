@@ -45,40 +45,20 @@ table_name = "downloads"
 max_queue_length = 12
 
 
+abort("Database (#{$database}) doesn't exist!") unless File.exists?($database)
+db = SQLite3::Database.open $database
+db.results_as_hash = true
+
 begin
-    if File.exists?($database)
-        db = SQLite3::Database.open $database
-    else
-        db = SQLite3::Database.new $database
-        db.execute "CREATE TABLE #{table_name}(id INTEGER PRIMARY KEY, Obsid INTEGER, Path TEXT, Status TEXT, LastChecked TEXT, SetupJobID INTEGER, RTSJobID INTEGER, Stdout TEXT)"
-    end
-    db.results_as_hash = true
-
-    # Add specified obsids.
-    # Some intelligent code here could determine if the obsid has already been processed.
-    obsids_in_table = db.execute("SELECT * FROM #{table_name}").map {|r| r[0]}
-    obtain_obsids(ARGV).each do |o|
-        next if obsids_in_table.include? o
-        obsids_in_table.push o
-        obj = Obsid.new(o)
-        obj.obs_type
-        if obj.type == "LymanA"
-            # One for high and low.
-            db.execute "INSERT INTO #{table_name} VALUES(null, #{o}, 'high', 'unqueued', '#{Time.now}', 0, 0, ' ')"
-            db.execute "INSERT INTO #{table_name} VALUES(null, #{o}, 'low', 'unqueued', '#{Time.now}', 0, 0, ' ')"
-        else
-            db.execute "INSERT INTO #{table_name} VALUES(null, #{o}, ' ', 'unqueued', '#{Time.now}', 0, 0, ' ')"
-        end
-    end
-
+    # Loop forever, until all obsids have been processed.
     loop do
-        _, jobs_in_queue, len_queue = get_queue("galaxy", ENV["USER"])
+        _, jobs_in_queue, len_queue = get_queue(machine: "galaxy", user: ENV["USER"])
 
         db.execute("SELECT * FROM #{table_name}") do |r|
             obsid = r["Obsid"]
             path = r["Path"]
             status = r["Status"]
-            status_update = false
+            new_status = nil
 
             # If this obsid is unqueued, don't do anything yet.
             if status == "unqueued"
@@ -114,12 +94,12 @@ begin
                 o = Obsid.new(obsid)
                 o.rts(setup_mins: 5,
                       cal_mins: $run_time,
-                      patch: $patch,
-                      peel: $peel,
-                      peel_number: $peel_number,
-                      timestamp: $timestamp,
+                      patch: r["Patch"] == 1 ? true : false,
+                      peel: r["Peel"] == 1 ? true : false,
+                      peel_number: r["PeelNumber"],
+                      timestamp: r["Timestamp"] == 1 ? true : false,
                       rts_path: $rts_path)
-                puts "Submitted #{obsid} (type: #{o.type})."
+                puts "Submitted #{obsid} as #{o.setup_jobid} (type: #{o.type})."
                 if o.type == "LymanA"
                     low_path = "#{o.path}/#{o.timestamp_dir}"
                     high_path = "#{o.path}/" << o.timestamp_dir.split('_').select { |e| e =~ /\d/ }.join('_') << "_high"
@@ -137,8 +117,6 @@ begin
                                     RTSJobID = #{o.low_patch_jobid},
                                     LastChecked = '#{Time.now}'
                                 WHERE Obsid = #{obsid} AND Path = 'low'")
-                    # db.execute "INSERT INTO #{table_name} VALUES('#{obsid}_high', 'setting up', '#{Time.now}', #{o.high_setup_jobid}, #{o.high_patch_jobid}, '#{o.timestamp_dir}', ' ')"
-                    # db.execute "INSERT INTO #{table_name} VALUES('#{obsid}_low', 'setting up', '#{Time.now}', #{o.low_setup_jobid}, #{o.low_patch_jobid}, '#{o.timestamp_dir}', ' ')"
                     len_queue += 4
                 else
                     db.execute("UPDATE #{table_name}

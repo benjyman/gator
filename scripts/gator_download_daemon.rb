@@ -36,7 +36,7 @@ db.results_as_hash = true
 begin
     # Loop forever, until all obsids have been downloaded.
     loop do
-        _, jobs_in_queue, len_queue = get_queue("zeus", ENV["USER"])
+        _, jobs_in_queue, len_queue = get_queue(machine: "zeus", user: ENV["USER"])
 
         db.execute("SELECT * FROM #{table_name}") do |r|
             obsid = r["Obsid"]
@@ -61,10 +61,12 @@ begin
                     end
 
                     last_line = stdout.split("\n").last
+                    # Deal with pesky single quotes by nuking them.
+                    last_line.gsub!('\'', "") if last_line
                     puts "#{obsid}: #{last_line}"
                     db.execute("UPDATE #{table_name}
                                 SET LastChecked = '#{Time.now}',
-                                    Stdout = '#{last_line.gsub('\'', "")}',
+                                    Stdout = '#{last_line}',
                                     Status = '#{status}'
                                 WHERE Obsid = #{obsid}")
                 end
