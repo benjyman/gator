@@ -205,6 +205,17 @@ def check_rts_status(path: ".")
     return status, final
 end
 
+# Convert two ionospheric statistics to a single number.
+# See Jordan et al. 2017 for more information.
+def iono_metric(mag:, pca:)
+    m = mag.to_f
+    eig = pca.to_f
+
+    metric = 25 * m
+    metric += 64 * eig * (eig - 0.6) if eig > 0.6
+    return metric.to_s
+end
+
 class Obsid
     attr_reader :obsid,
                 :type,
@@ -380,7 +391,7 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
         end
     end
 
-    def rts_setup(mins: 5)
+    def rts_setup(mins: 10)
         contents = generate_slurm_header(job_name: "se_#{@obsid}",
                                          machine: "galaxy",
                                          partition: "gpuq",

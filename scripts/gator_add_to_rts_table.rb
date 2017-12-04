@@ -48,14 +48,17 @@ def insert_row(database, obsid, path)
                              #{$timestamp ? 1 : 0},
                              #{$patch ? 1 : 0},
                              #{$peel ? 1 : 0},
-                             #{$peel_number})"
+                             #{$peel_number},
+                             ' ',
+                             ' ',
+                             ' ')"
 end
 
 if File.exists?($database)
     db = SQLite3::Database.open $database
 else
     db = SQLite3::Database.new $database
-    db.execute "CREATE TABLE #{$table_name}(id INTEGER PRIMARY KEY, Obsid INTEGER, Path TEXT, Status TEXT, LastChecked TEXT, SetupJobID INTEGER, RTSJobID INTEGER, Stdout TEXT, Timestamp INTEGER, Patch INTEGER, Peel INTEGER, PeelNumber INTEGER)"
+    db.execute "CREATE TABLE #{$table_name}(id INTEGER PRIMARY KEY, Obsid INTEGER, Path TEXT, Status TEXT, LastChecked TEXT, SetupJobID INTEGER, RTSJobID INTEGER, Stdout TEXT, Timestamp INTEGER, Patch INTEGER, Peel INTEGER, PeelNumber INTEGER, IonoMagnitude TEXT, IonoPCA TEXT, IonoQA TEXT)"
 end
 db.results_as_hash = true
 
