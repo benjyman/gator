@@ -29,14 +29,25 @@ table_name = "downloads"
 db = SQLite3::Database.open $database
 db.results_as_hash = true
 
-db.execute("SELECT * FROM #{table_name}") do |r|
+if not $purge_all
+    rows = db.execute("SELECT * FROM #{table_name}
+                       WHERE Status IS NOT 'peeled'
+                       AND   Status IS NOT 'unqueued'")
+    print "Will delete #{rows.length} failed RTS runs. Proceed? [yN] "
+else
+    rows = db.execute("SELECT * FROM #{table_name}")
+    print "Will delete #{rows.length} RTS runs. Proceed? [yN] "
+end
+
+response = STDIN.gets.chomp
+abort("*** Aborting.") unless response.downcase == "y"
+
+rows.each do |r|
     obsid = r["Obsid"]
     path = r["Path"]
-    status = r["Status"]
 
-    if $purge_all or (status != "peeled" and status != "unqueued")
-        FileUtils.rm_r path unless path.strip.empty?
-        db.execute("UPDATE #{table_name}
+    FileUtils.rm_r path unless path.strip.empty?
+    db.execute("UPDATE #{table_name}
                     SET Path = ' ',
                         Status = 'unqueued',
                         LastChecked = '#{Time.now}',
@@ -44,6 +55,6 @@ db.execute("SELECT * FROM #{table_name}") do |r|
                         RTSJobID = 0,
                         Stdout = ' '
                     WHERE Obsid = #{obsid} AND Path = '#{path}'")
-        puts "#{obsid} #{path}"
-    end
+
+    puts "#{obsid} #{path}"
 end
