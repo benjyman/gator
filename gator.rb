@@ -261,7 +261,7 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
         @download_jobid = sbatch("#{@obsid}.sh").match(/Submitted batch job (\d+)/)[1].to_i
     end
 
-    def rts(setup_mins: 5, cal_mins: 40, patch: true, peel: true, peel_number: 1000, timestamp: true, rts_path: "/group/mwaeor/CODE/RTS/bin/rts_gpu")
+    def rts(setup_mins: 5, cal_mins: 40, patch: true, peel: true, peel_number: 1000, timestamp: true, rts_path: "rts_gpu")
         if peel and not patch
             abort "Cannot peel if we are not patching; exiting."
         end

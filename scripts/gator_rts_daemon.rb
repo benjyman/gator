@@ -32,7 +32,7 @@ OptionParser.new do |opts|
     $peel = true
 	opts.on("--peel", "Disable the peel step. Default: #{$peel}") {$peel = false}
 
-    $rts_path = "/group/mwaeor/CODE/RTS/bin/rts_gpu"
+    $rts_path = `which rts_gpu`.strip
 	opts.on("--rts_path", "Specify the path to the RTS executable. Default: #{$peel}") {|o| $rts_path = o}
 end.parse!
 
