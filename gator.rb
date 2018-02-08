@@ -3,39 +3,7 @@ require "fileutils"
 abort("$MWA_DIR not defined.") unless ENV["MWA_DIR"]
 $mwa_dir = ENV["MWA_DIR"].chomp('/')
 $project = ENV["PAWSEY_PROJECT"]
-$download_modules = "
-module purge
-module load pyephem \\
-            setuptools
-"
-$rts_modules = "
-module purge
-module load PrgEnv-gnu \\
-            alps \\
-            cray-libsci \\
-            cmake \\
-            fftw \\
-            lapack \\
-            cudatoolkit \\
-            cfitsio \\
-            boost \\
-            casacore \\
-            ephem \\
-            readline \\
-            gsl \\
-            scipy \\
-            astropy \\
-            pytz \\
-            pyephem \\
-            psycopg2 \\
-            setuptools \\
-            matplotlib \\
-            h5py
 
-export LD_LIBRARY_PATH=/group/mwaops/CODE/lib:/lib64:/usr/lib64:${LD_LIBRARY_PATH}
-# For some stupid reason, \"module load cfitsio\" above does not put the appropriate library path in.
-export LD_LIBRARY_PATH=/pawsey/cle52up04/devel/PrgEnv-gnu/5.2.82/gcc/4.8.2/ivybridge/cfitsio/3370/lib:${LD_LIBRARY_PATH}
-"
 
 class Float
     def close_to?(n, tol: 0.1)
@@ -283,8 +251,6 @@ class Obsid
                                          nodes: 1,
                                          output: "getNGASdata-#{@obsid}-%A.out")
         contents << "
-#{$download_modules}
-
 cd #{$mwa_dir}/data
 obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
 "
@@ -399,8 +365,6 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
                                          nodes: 1,
                                          output: "RTS-setup-#{@obsid}-%A.out")
         contents << "
-#{$rts_modules}
-
 list_gpubox_files.py obsid.dat
 ln -sf ../gpufiles_list.dat .
 
@@ -476,7 +440,7 @@ sed -i \"s|\\(NumberOfIonoCalibrators=\\).*|\\1#{@peel_number}|\" #{ENV["USER"]}
 sed -i \"s|\\(ObservationFrequencyBase=\\).*|\\1#{@obs_freq_base}|\" #{ENV["USER"]}_rts_0.in
 sed -i \"s|\\(ObservationFrequencyBase=\\).*|\\1#{@obs_freq_base}|\" #{ENV["USER"]}_rts_1.in
 " if @obs_freq_base
-        
+
         Dir.chdir @path unless Dir.pwd == @path
         FileUtils.mkdir_p @timestamp_dir
         Dir.chdir @timestamp_dir
@@ -499,8 +463,6 @@ sed -i \"s|\\(ObservationFrequencyBase=\\).*|\\1#{@obs_freq_base}|\" #{ENV["USER
                                          nodes: num_nodes,
                                          output: "RTS-patch-#{@obsid}-%A.out")
         contents << "
-#{$rts_modules}
-
 echo \"\nRunning RTS patch\"
 aprun -n #{num_nodes} -N 1 #{@rts_path} #{ENV["USER"]}_rts_0.in
 
@@ -536,8 +498,6 @@ aprun -n #{num_nodes} -N 1 #{@rts_path} #{ENV["USER"]}_rts_1.in\n"
                                          nodes: num_nodes,
                                          output: "RTS-peel-#{@obsid}-%A.out")
         contents << "
-#{$rts_modules}
-
 aprun -n #{num_nodes} -N 1 #{@rts_path} #{ENV["USER"]}_rts_1.in
 "
 
