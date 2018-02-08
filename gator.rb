@@ -131,8 +131,7 @@ end
 
 def generate_slurm_header(job_name:, machine:, partition:, mins:, nodes:, ntasks_per_node: 1, output: nil)
     stdout = output ? output : "#{job_name}-%A.out"
-    return \
-"#!/bin/bash
+    header = "#!/bin/bash
 #SBATCH --job-name=#{job_name}
 #SBATCH --output=#{stdout}
 #SBATCH --nodes=#{nodes}
@@ -142,6 +141,7 @@ def generate_slurm_header(job_name:, machine:, partition:, mins:, nodes:, ntasks
 #SBATCH --partition=#{partition}
 #SBATCH --account=#{$project}
 #SBATCH --export=NONE
+    header << "set -eux
 "
 end
 
@@ -397,17 +397,15 @@ ln -sf ../gpufiles_list.dat .
 #####
 # new way / getting rid off the wrapper generate_dynamic_RTS_sourcelists.py
 #
-# two commands feeding directly srclist_by_beam.py to pick randomly sources and attenuate them 
-# by the beam. one to feed the patch (calibrate data) and one to feed in peel (peel sources from data) 
+# two commands feeding directly srclist_by_beam.py to pick randomly sources and attenuate them
+# by the beam. one to feed the patch (calibrate data) and one to feed in peel (peel sources from data)
 #####
-echo \"\nRunning srclist_by_beam.py for a patch source list.\"
 srclist_by_beam.py -n 1000 \\
                    --srclist=#{@source_list} \\
                    --metafits=#{@metafits} \\
                    --order=\"distance\"
 "
         contents << "
-echo \"\nRunning srclist_by_beam.py for a peel source list.\"
 srclist_by_beam.py -n 3000 \\
                    --srclist=#{@source_list} \\
                    --metafits=#{@metafits} \\
@@ -419,8 +417,7 @@ srclist_by_beam.py -n 3000 \\
 #####
 
 #####
-# generate the rts_patch.sh file - to many options and stuff. should be more like rts_setup! 
-echo \"\nRunning generate_mwac_qRTS_auto.py\"
+# generate the rts_patch.sh file - to many options and stuff. should be more like rts_setup!
 generate_mwac_qRTS_auto.py #{@path}/#{@timestamp_dir}/obsid.dat \\
                            #{ENV["USER"]} 24 \\
                            /group/mwaeor/bpindor/templates/EOR0_selfCalandPeel_PUMA1000_WriteUV_80khz_cotter_template.dat \\
@@ -430,12 +427,10 @@ generate_mwac_qRTS_auto.py #{@path}/#{@timestamp_dir}/obsid.dat \\
                            --sourcelist=#{@source_list}
 #####
 
-echo \"\nRunning reflag_mwaf_files.py\"
 reflag_mwaf_files.py #{@path}/#{@timestamp_dir}/obsid.dat
 
-##### 
+#####
 # the following should be replaced by a template generation function from metafits header.
-echo \"\nRunning generate_RTS_in_mwac.py\"
 generate_RTS_in_mwac.py #{@path} \\
                         #{ENV["USER"]} 24 128T \\
                         --templates=/group/mwaeor/bpindor/templates/EOR0_selfCalandPeel_PUMA1000_WriteUV_80khz_cotter_template.dat \\
@@ -489,17 +484,12 @@ sed -i \"s|\\(ObservationFrequencyBase=\\).*|\\1#{@obs_freq_base}|\" #{ENV["USER
                                          nodes: num_nodes,
                                          output: "RTS-patch-#{@obsid}-%A.out")
         contents << "
-echo \"\nRunning RTS patch\"
 aprun -n #{num_nodes} -N 1 #{@rts_path} #{ENV["USER"]}_rts_0.in
-
-echo \"\nRunning plot_BPcal_128T.py\"
 /group/mwaeor/cjordan/Software/plot_BPcal_128T.py
 
-echo \"\nRunning plot_CalSols.py\"
 /group/mwaeor/cjordan/Software/plot_CalSols.py --base_dir=`pwd` -n #{@obsid} -i
 touch flagged_tiles.txt
 
-echo \"\nRunning RTS patch\"
 aprun -n #{num_nodes} -N 1 #{@rts_path} #{ENV["USER"]}_rts_0.in
 "
         if peel
