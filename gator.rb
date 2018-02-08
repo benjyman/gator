@@ -140,7 +140,12 @@ def generate_slurm_header(job_name:, machine:, partition:, mins:, nodes:, ntasks
 #SBATCH --clusters=#{machine}
 #SBATCH --partition=#{partition}
 #SBATCH --account=#{$project}
-#SBATCH --export=NONE
+#SBATCH --export=ALL
+"
+
+    header << "#SBATCH --gres=gpu:1
+" if partition == "gpuq"
+
     header << "set -eux
 "
 end
@@ -154,7 +159,7 @@ end
 def flag_tiles
     # A cheap, horrible hack until I can be bothered doing something more appropriate.
     # For now, just look at the bandpass calibration solutions.
-    bp_output = `/group/mwaeor/cjordan/Software/plot_BPcal_128T.py`
+    bp_output = `/group/mwaeor/cjordan/software/plot_BPcal_128T.py`
     bp_output.scan(/\(flag\s+(\d+)\?\)/).flatten.uniq.join("\n")
 end
 
@@ -484,17 +489,16 @@ sed -i \"s|\\(ObservationFrequencyBase=\\).*|\\1#{@obs_freq_base}|\" #{ENV["USER
                                          nodes: num_nodes,
                                          output: "RTS-patch-#{@obsid}-%A.out")
         contents << "
-aprun -n #{num_nodes} -N 1 #{@rts_path} #{ENV["USER"]}_rts_0.in
-/group/mwaeor/cjordan/Software/plot_BPcal_128T.py
+srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_0.in
 
-/group/mwaeor/cjordan/Software/plot_CalSols.py --base_dir=`pwd` -n #{@obsid} -i
+/group/mwaeor/cjordan/software/plot_BPcal_128T.py
+/group/mwaeor/cjordan/software/plot_CalSols.py --base_dir=`pwd` -n #{@obsid} -i
 touch flagged_tiles.txt
 
-aprun -n #{num_nodes} -N 1 #{@rts_path} #{ENV["USER"]}_rts_0.in
+srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_0.in
 "
         if peel
-            contents << "echo \"\nRunning RTS peel\"
-aprun -n #{num_nodes} -N 1 #{@rts_path} #{ENV["USER"]}_rts_1.in\n"
+            contents << "srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_1.in\n"
         end
 
         Dir.chdir "#{@path}/#{@timestamp_dir}" unless Dir.pwd == "#{@path}/#{@timestamp_dir}"
@@ -514,7 +518,7 @@ aprun -n #{num_nodes} -N 1 #{@rts_path} #{ENV["USER"]}_rts_1.in\n"
                                          nodes: num_nodes,
                                          output: "RTS-peel-#{@obsid}-%A.out")
         contents << "
-aprun -n #{num_nodes} -N 1 #{@rts_path} #{ENV["USER"]}_rts_1.in
+srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_1.in
 "
 
         Dir.chdir "#{@path}/#{@timestamp_dir}" unless Dir.pwd == "#{@path}/#{@timestamp_dir}"
