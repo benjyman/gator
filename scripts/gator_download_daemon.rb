@@ -50,20 +50,22 @@ begin
                 jobid = r["JobID"]
                 unless jobs_in_queue.include? jobid
                     stdout = File.read("#{ENV["MWA_DIR"].chomp('/')}/data/#{obsid}/getNGASdata-#{obsid}-#{jobid}.out")
+                    last_line = stdout.split("\n").last
+                    # Deal with pesky single quotes by nuking them.
+                    last_line.gsub!('\'', "") if last_line
+
                     # If the download was successful...
                     if stdout.scan(/File Transfer Success/).count == 1
                         # ... update the table to say so.
                         status = "downloaded"
+                        puts "#{obsid.to_s.green}: #{last_line}"
                     # If the download was not successful...
                     else
                         # ... label as 'failed', and a download will be tried again later.
                         status = "failed"
+                        puts "#{obsid.to_s.red}: #{last_line}"
                     end
 
-                    last_line = stdout.split("\n").last
-                    # Deal with pesky single quotes by nuking them.
-                    last_line.gsub!('\'', "") if last_line
-                    puts "#{obsid}: #{last_line}"
                     db.execute("UPDATE #{table_name}
                                 SET LastChecked = '#{Time.now}',
                                     Stdout = '#{last_line}',
@@ -86,7 +88,7 @@ begin
                 obj = Obsid.new(obsid)
                 obj.download
                 jobid = obj.download_jobid
-                puts "Submitted #{obsid} as job #{jobid}"
+                puts "Submitted #{obsid.to_s.blue} as job #{jobid.to_s.blue}"
                 db.execute("UPDATE #{table_name}
                             SET Status = 'downloading',
                                 JobID = #{jobid},
@@ -94,16 +96,15 @@ begin
                             WHERE Obsid = #{obsid}")
                 len_queue += 1
             end
-
         end
 
         # Check the status of all obsids - have they all been downloaded? If so, exit.
         num_not_downloaded = db.execute("SELECT * FROM #{table_name} WHERE NOT Status = 'downloaded'").length
         if num_not_downloaded == 0
-            puts "\nJobs done."
+            puts "\nJobs done.".green
             exit
         else
-            puts "Number of obsids not yet downloaded: #{num_not_downloaded}"
+            puts "Number of obsids not yet downloaded: #{num_not_downloaded.to_s.yellow}"
         end
 
         puts "Sleeping...\n\n"

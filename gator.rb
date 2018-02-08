@@ -11,6 +11,32 @@ class Float
     end
 end
 
+class String
+    # https://stackoverflow.com/questions/1489183/colorized-ruby-output
+    def colorize(color_code)
+        "\e[#{color_code}m#{self}\e[0m"
+    end
+
+    def red
+        colorize(31)
+    end
+
+    def green
+        colorize(32)
+    end
+
+    def yellow
+        colorize(33)
+    end
+
+    def blue
+        colorize(34)
+    end
+
+    def pink
+        colorize(35)
+    end
+end
 
 def get_queue(machine:, user:)
     queue = `squeue -M #{machine} -u #{user} 2>&1`

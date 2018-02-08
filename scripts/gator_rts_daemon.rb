@@ -77,9 +77,13 @@ begin
             end
             if new_status
                 if final
-                    puts "#{obsid}: #{new_status} - #{final}"
+                    if new_status == "peeled"
+                        puts "#{obsid.to_s.green}: #{new_status} - #{final}"
+                    else
+                        puts "#{obsid.to_s.red}: #{new_status} - #{final}"
+                    end
                 else
-                    puts "#{obsid}: #{new_status}"
+                    puts "#{obsid.to_s.blue}: #{new_status}"
                 end
                 if new_status == "peeled"
                     # Run cthulhu to get the ionospheric information from the newly peeled obsid.
@@ -126,7 +130,7 @@ begin
                       peel_number: r["PeelNumber"],
                       timestamp: r["Timestamp"] == 1 ? true : false,
                       rts_path: $rts_path)
-                puts "Submitted #{obsid} as #{o.setup_jobid} (type: #{o.type})."
+                puts "Submitted #{obsid.to_s.blue} as #{o.setup_jobid.to_s.blue} (type: #{o.type})."
                 if o.type == "LymanA"
                     low_path = "#{o.path}/#{o.timestamp_dir}"
                     high_path = "#{o.path}/" << o.timestamp_dir.split('_').select { |e| e =~ /\d/ }.join('_') << "_high"
@@ -167,17 +171,17 @@ begin
             end
         end
         if incomplete == 0
-            puts "\nJobs done."
+            puts "\nJobs done.".green
             exit
         else
-            puts "Number of obsids not yet processed: #{incomplete}"
+            puts "Number of obsids not yet processed: #{incomplete.to_s.yellow}"
         end
 
         puts "Sleeping...\n\n"
         sleep $sleep_time
     end
 
-rescue SQLite3::Exception => e 
+rescue SQLite3::Exception => e
     puts "#{e.class}: #{e}"
 
 ensure
