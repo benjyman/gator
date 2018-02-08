@@ -151,9 +151,14 @@ def generate_slurm_header(job_name:, machine:, partition:, mins:, nodes:, ntasks
 end
 
 def rts_version(path)
-    git_dir = path.split("/bin")[0]
-    git_commit = `git --git-dir #{git_dir}/.git log "HEAD^..HEAD"`
-    "#{path}\n\n#{git_commit}"
+    path = `which #{path}`.chomp unless path.include?('/')
+    git_commit_file = path.split('/')[0..-2].join('/') + "/git_commit.txt"
+    if File.exists?(git_commit_file)
+        git_commit = File.readlines(git_commit_file).join
+        "#{path}\n\n#{git_commit}"
+    else
+        path
+    end
 end
 
 def flag_tiles
