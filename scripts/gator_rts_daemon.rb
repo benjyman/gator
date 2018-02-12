@@ -32,8 +32,11 @@ OptionParser.new do |opts|
     $peel = true
 	opts.on("--peel", "Disable the peel step. Default: #{$peel}") {$peel = false}
 
+    $srclist = "/group/mwa/software/RTS/sourcelists/srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt"
+	opts.on("--srclist", "Specify the source list to be used. Default: #{$srclist}") {|o| $srclist = o}
+
     $rts_path = `which rts_gpu`.strip
-	opts.on("--rts_path", "Specify the path to the RTS executable. Default: #{$peel}") {|o| $rts_path = o}
+	opts.on("--rts_path", "Specify the path to the RTS executable. Default: #{$rts_path}") {|o| $rts_path = o}
 end.parse!
 
 abort("$MWA_DIR not defined.") unless ENV["MWA_DIR"]
@@ -107,6 +110,7 @@ begin
                     # Update the MWA QA database with the results.
                     `mwaqa_update_db.py -o #{obsid} \\
                                         -p #{path} \\
+                                        -s #{File.basename($srclist)} \\
                                         --iono_mag #{mag} \\
                                         --iono_pca #{pca}`
                 else
@@ -129,6 +133,7 @@ begin
                       peel: r["Peel"] == 1 ? true : false,
                       peel_number: r["PeelNumber"],
                       timestamp: r["Timestamp"] == 1 ? true : false,
+                      srclist: $srclist,
                       rts_path: $rts_path)
                 puts "Submitted #{obsid.to_s.blue} as #{o.setup_jobid.to_s.blue} (type: #{o.type})."
                 if o.type == "LymanA"

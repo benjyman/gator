@@ -297,7 +297,14 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
         @download_jobid = sbatch("#{@obsid}.sh").match(/Submitted batch job (\d+)/)[1].to_i
     end
 
-    def rts(setup_mins: 5, cal_mins: 40, patch: true, peel: true, peel_number: 1000, timestamp: true, rts_path: "rts_gpu")
+    def rts(setup_mins: 10,
+            cal_mins: 40,
+            patch: true,
+            peel: true,
+            peel_number: 1000,
+            timestamp: true,
+            srclist: "/group/mwa/software/RTS/sourcelists/srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt",
+            rts_path: "rts_gpu")
         if peel and not patch
             abort "Cannot peel if we are not patching; exiting."
         end
@@ -342,12 +349,7 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
             @timestamp_dir = ""
         end
 
-        # Depending on your project, we point to a specific master source list file.
-        if $project == "mwasci"
-            @source_list = "/group/mwasci/gdrouart/Softwares/srclists/srclist_puma-v3_complete.txt"
-        elsif $project == "mwaeor"
-            @source_list = "/group/mwaeor/cjordan/srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt"
-        end
+        @source_list = srclist
         source_list_prefix = @source_list.split('/').last.split(".txt").first
         @patch_source_catalogue_file = "#{@path}/#{timestamp_dir}/#{source_list_prefix}_#{@obsid}_patch1000.txt"
         @peel_source_catalogue_file = "#{@path}/#{timestamp_dir}/#{source_list_prefix}_#{@obsid}_peel3000.txt"

@@ -26,8 +26,11 @@ OptionParser.new do |opts|
     $peel = true
 	opts.on("--peel", "Disable the peel step. Default: #{$peel}") {$peel = false}
 
+    $srclist = "/group/mwa/software/RTS/sourcelists/srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt"
+	opts.on("--srclist", "Specify the source list to be used. Default: #{$srclist}") {|o| $srclist = o}
+
     $rts_path = `which rts_gpu`.strip
-	opts.on("--rts_path", "Specify the path to the RTS executable. Default: #{$peel}") {|o| $rts_path = o}
+	opts.on("--rts_path", "Specify the path to the RTS executable. Default: #{$rts_path}") {|o| $rts_path = o}
 end.parse!
 
 
@@ -36,12 +39,13 @@ if __FILE__ == $0
 
     obtain_obsids(ARGV).each do |obsid|
         o = Obsid.new(obsid)
-        o.rts(setup_mins: 5,
+        o.rts(setup_mins: 10,
               cal_mins: $run_time,
               patch: $patch,
               peel: $peel,
               peel_number: $peel_number,
               timestamp: $timestamp,
+              srclist: $srclist,
               rts_path: $rts_path)
         puts "#{obsid}: #{o.type}"
     end
