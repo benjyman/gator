@@ -12,7 +12,7 @@ $LOAD_PATH.unshift "#{File.dirname(__FILE__)}/.."
 require "gator"
 
 OptionParser.new do |opts|
-    opts.banner = "Usage: #{__FILE__} [-d /path/to/database]\nDownload all of the obsids specified in the database."
+    opts.banner = "Usage: #{__FILE__} [-d /path/to/database]\nPurge failed (default) or all RTS runs from an SQLite table."
     opts.on("-h", "--help", "Display this message.") {puts opts; exit}
 
     $database = "#{ENV["MYGROUP"]}/rts.sqlite"
