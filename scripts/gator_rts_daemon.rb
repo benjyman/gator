@@ -32,7 +32,7 @@ OptionParser.new do |opts|
     $peel = true
 	opts.on("--peel", "Disable the peel step. Default: #{$peel}") {$peel = false}
 
-    $srclist = "/group/mwa/software/RTS/sourcelists/srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt"
+    $srclist = "#{ENV["SRCLIST_ROOT"]}/srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt"
 	opts.on("--srclist", "Specify the source list to be used. Default: #{$srclist}") {|o| $srclist = o}
 
     $rts_path = `which rts_gpu`.strip

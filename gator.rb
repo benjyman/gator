@@ -1,6 +1,7 @@
 require "fileutils"
 
 abort("$MWA_DIR not defined.") unless ENV["MWA_DIR"]
+abort("$SRCLIST_ROOT not defined.") unless ENV["SRCLIST_ROOT"]
 $mwa_dir = ENV["MWA_DIR"].chomp('/')
 $project = ENV["PAWSEY_PROJECT"]
 
@@ -303,7 +304,7 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
             peel: true,
             peel_number: 1000,
             timestamp: true,
-            srclist: "/group/mwa/software/RTS/sourcelists/srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt",
+            srclist: "#{ENV["SRCLIST_ROOT"]}/srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt",
             rts_path: "rts_gpu")
         if peel and not patch
             abort "Cannot peel if we are not patching; exiting."
