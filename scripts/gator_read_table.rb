@@ -9,7 +9,7 @@ OptionParser.new do |opts|
     opts.on("-h", "--help", "Display this message.") {puts opts; exit}
 
     $database = "#{ENV["MYGROUP"]}/obsids.sqlite"
-	opts.on("-d", "--database DATABASE", "Specify the database to be used. By default, this is #{$database}") {|o| $database = o}
+	opts.on("-d", "--database DATABASE", "Specify the database to be used. Default: #{$database}") {|o| $database = o}
 
     $rows = Float::INFINITY
 	opts.on("-n", "--number_of_rows NUMBER", "Specify the database rows to be printed. By default, all rows are printed.") {|o| $rows = o.to_i}

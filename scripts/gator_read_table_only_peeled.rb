@@ -8,7 +8,7 @@ OptionParser.new do |opts|
     opts.on("-h", "--help", "Display this message.") {puts opts; exit}
 
     $database = "#{ENV["MYGROUP"]}/obsids.sqlite"
-	opts.on("-d", "--database DATABASE", "Specify the database to be used. By default, this is #{$database}") {|o| $database = o}
+	opts.on("-d", "--database DATABASE", "Specify the database to be used. Default: #{$database}") {|o| $database = o}
 end.parse!
 
 # Multiple tables can be used in the same database, but for now assume it's always the same one.

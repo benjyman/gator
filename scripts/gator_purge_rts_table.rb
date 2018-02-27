@@ -19,7 +19,7 @@ OptionParser.new do |opts|
 	opts.on("-d", "--database DATABASE", "Specify the database to be used. Default: #{$database}") {|o| $database = o}
 
     $purge_all = false
-	opts.on("-a", "--all", "Purge all rows of the table, even if they've been peeled. Default: #{$database}") {|o| $purge_all = true}
+	opts.on("-a", "--all", "Purge all rows of the table, even if they've been peeled.") {|o| $purge_all = true}
 end.parse!
 
 

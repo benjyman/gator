@@ -10,7 +10,7 @@ OptionParser.new do |opts|
     opts.on("-h", "--help", "Display this message.") {puts opts; exit}
 
     $database = "#{ENV["MYGROUP"]}/obsids.sqlite"
-	opts.on("-d", "--database DATABASE", "Specify the database to be used. By default, this is #{$database}") {|o| $database = o}
+	opts.on("-d", "--database DATABASE", "Specify the database to be used. Default: #{$database}") {|o| $database = o}
 
     $peel_number = 1000
 	opts.on("-p", "--peel_number NUM", "Peel this many sources with the RTS. Default: #{$peel_number}") {|o| $peel_number = o.to_i}
