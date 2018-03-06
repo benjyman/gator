@@ -221,6 +221,26 @@ def iono_metric(mag:, pca:)
     return metric.to_s
 end
 
+def upload_qa_results(obsid:, path:, srclist:)
+    # Find the peel log corresponding to the highest frequency.
+    peel_logs = Dir.glob("#{path}/rts*node*.log")
+    smallest_node = peel_logs.map { |f| f.match(/node(\d{3})/)[1] }.min
+    peel_log = peel_logs.select { |f| f.include? "node#{smallest_node}" }
+                   .sort_by { |f| File.mtime(f) }.last
+    # Run the log through cthulhu.
+    mag, pca = `cthulhu_wrapper.py #{peel_log}`.chomp.split.drop(1)
+    iono_qa = iono_metric(mag: mag, pca: pca)
+
+    # Update the MWA QA database with the results.
+    `mwaqa_update_db.py -o #{obsid} \\
+                        -p #{path} \\
+                        -s #{File.basename(srclist)} \\
+                        --iono_mag #{mag} \\
+                        --iono_pca #{pca}`
+
+    return mag, pca, iono_qa
+end
+
 class Obsid
     attr_reader :obsid,
                 :type,

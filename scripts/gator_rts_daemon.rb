@@ -89,30 +89,17 @@ begin
                     puts "#{obsid.to_s.blue}: #{new_status}"
                 end
                 if new_status == "peeled"
-                    # Run cthulhu to get the ionospheric information from the newly peeled obsid.
-                    # Find the newest RTS log, corresponding to a peel run.
-                    peel_logs = Dir.glob("#{path}/rts*node*.log")
-                    smallest_node = peel_logs.map { |f| f.match(/node(\d{3})/)[1] }.min
-                    peel_log = peel_logs.select { |f| f.include? "node#{smallest_node}" }
-                                        .sort_by { |f| File.mtime(f) }.last
-                    mag, pca = `cthulhu_wrapper.py #{peel_log}`.chomp.split.drop(1)
-                    iono_qa = iono_metric(mag: mag, pca: pca)
+                    # Upload the successful RTS results to the QA database.
+                    iono_mag, iono_pca, iono_qa = upload_qa_results(obsid: obsid, path: path, srclist: $srclist)
 
                     # Update the SQLite database.
                     db.execute("UPDATE #{table_name}
                                 SET Status = '#{new_status}',
                                     LastChecked = '#{Time.now}',
-                                    IonoMagnitude = '#{mag}',
-                                    IonoPCA = '#{pca}',
+                                    IonoMagnitude = '#{iono_mag}',
+                                    IonoPCA = '#{iono_pca}',
                                     IonoQA = '#{iono_qa}'
                                 WHERE Obsid = #{obsid} AND Path = '#{path}'")
-
-                    # Update the MWA QA database with the results.
-                    `mwaqa_update_db.py -o #{obsid} \\
-                                        -p #{path} \\
-                                        -s #{File.basename($srclist)} \\
-                                        --iono_mag #{mag} \\
-                                        --iono_pca #{pca}`
                 else
                     # If the new status isn't "peeled", then simply update the SQLite database.
                     db.execute("UPDATE #{table_name}
