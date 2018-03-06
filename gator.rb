@@ -555,6 +555,6 @@ srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_1.in
     end
 
     def rts_status
-        check_rts_status(path: "#{@path}/#{@timestamp_dir}")
+        @status, @final_message = check_rts_status(path: "#{@path}/#{@timestamp_dir}")
     end
 end
