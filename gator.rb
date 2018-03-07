@@ -144,11 +144,8 @@ def generate_slurm_header(job_name:, machine:, partition:, mins:, nodes:, ntasks
 #SBATCH --export=ALL
 "
 
-    header << "#SBATCH --gres=gpu:1
-" if partition == "gpuq"
-
-    header << "set -eux
-"
+    header << "#SBATCH --gres=gpu:1" << "\n" if partition == "gpuq"
+    header << "set -eux" << "\n"
 end
 
 def rts_version(path)
@@ -221,12 +218,13 @@ def iono_metric(mag:, pca:)
     return metric.to_s
 end
 
-def upload_qa_results(obsid:, path:, srclist:)
+def determine_iono_metrics(obsid:, path:, srclist:)
     # Find the peel log corresponding to the highest frequency.
     peel_logs = Dir.glob("#{path}/rts*node*.log")
     smallest_node = peel_logs.map { |f| f.match(/node(\d{3})/)[1] }.min
     peel_log = peel_logs.select { |f| f.include? "node#{smallest_node}" }
-                   .sort_by { |f| File.mtime(f) }.last
+                        .sort_by { |f| File.mtime(f) }
+                        .last
     # Run the log through cthulhu.
     mag, pca = `cthulhu_wrapper.py #{peel_log}`.chomp.split.drop(1)
     iono_qa = iono_metric(mag: mag, pca: pca)

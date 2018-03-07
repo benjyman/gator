@@ -90,7 +90,9 @@ begin
                 end
                 if new_status == "peeled"
                     # Upload the successful RTS results to the QA database.
-                    iono_mag, iono_pca, iono_qa = upload_qa_results(obsid: obsid, path: path, srclist: $srclist)
+                    iono_mag, iono_pca, iono_qa = determine_iono_metrics(obsid: obsid,
+                                                                         path: path,
+                                                                         srclist: $srclist)
 
                     # Update the SQLite database.
                     db.execute("UPDATE #{table_name}
