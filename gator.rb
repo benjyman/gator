@@ -231,12 +231,15 @@ def upload_qa_results(obsid:, path:, srclist:)
     mag, pca = `cthulhu_wrapper.py #{peel_log}`.chomp.split.drop(1)
     iono_qa = iono_metric(mag: mag, pca: pca)
 
-    # Update the MWA QA database with the results.
-    `mwaqa_update_db.py -o #{obsid} \\
-                        -p #{path} \\
-                        -s #{File.basename(srclist)} \\
-                        --iono_mag #{mag} \\
-                        --iono_pca #{pca}`
+    # Update the MWA QA database with the results if you're using a
+    # non-standard PGHOST, which implies that you're allowed to write to the DB.
+    if not ENV["PGHOST"] == "mwa-metadata01.pawsey.org.au"
+        `mwaqa_update_db.py -o #{obsid} \\
+                            -p #{path} \\
+                            -s #{File.basename(srclist)} \\
+                            --iono_mag #{mag} \\
+                            --iono_pca #{pca}`
+    end
 
     return mag, pca, iono_qa
 end
