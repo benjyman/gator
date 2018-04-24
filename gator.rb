@@ -468,7 +468,7 @@ reflag_mwaf_files.py #{@path}/#{@timestamp_dir}/obsid.dat
 generate_RTS_in_mwac.py #{@path} \\
                         #{ENV["USER"]} 24 128T \\
                         --templates=/group/mwaeor/bpindor/templates/EOR0_selfCalandPeel_PUMA1000_WriteUV_80khz_cotter_template.dat \\
-                        --header=#{@obsid}_metafits_ppds.fits \\
+                        --header=#{@metafits} \\
                         --channel_flags=/group/mwaeor/bpindor/templates/flagged_channels_default.txt
 
 sed -i \"s|\\(CorrDumpsPerCadence=\\).*|\\1#{@corr_dumps_per_cadence_cal}|\" #{ENV["USER"]}_rts_0.in
