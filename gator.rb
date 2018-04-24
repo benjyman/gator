@@ -499,7 +499,7 @@ sed -i \"s|\\(ObservationFrequencyBase=\\).*|\\1#{@obs_freq_base}|\" #{ENV["USER
         Dir.chdir @path unless Dir.pwd == @path
         FileUtils.mkdir_p @timestamp_dir
         Dir.chdir @timestamp_dir
-        system("ln -sf ../*metafits_ppds.fits .")
+        system("ln -sf ../*metafits* .")
         write(file: "obsid.dat", contents: @obsid)
         write(file: "rts_setup.sh", contents: contents)
         @setup_jobid = sbatch("rts_setup.sh").match(/Submitted batch job (\d+)/)[1].to_i
