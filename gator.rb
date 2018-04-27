@@ -290,6 +290,8 @@ class Obsid
                 @type = "EOR0"
             elsif ra.close_to?(60, tol: 5)
                 @type = "EOR1"
+            elsif ra.close_to?(155, tol: 5)
+                @type = "EOR2"
             elsif filename.include? "LymanA"
                 @type = "LymanA"
             else
@@ -417,13 +419,47 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
         end
     end
 
-    def rts_setup(mins: 10)
+    def rts_setup(mins: 10,
+                  cotter: true,
+                  ben_code_base: "/astro/mwaeor/bmckinley/code/"
+                  )
+        @cotter = cotter
+        @ben_code_base = ben_code_base
+        if @type == "EOR2"
+            @epoch_id = "2014A_EoR2_gp13"
+            @srclist_code_base = "/group/mwa/software/srclists/master/"
+            @sourcelist = "srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt" 
+            @track_moon_string = "'' "
+            @sister_obsid_infile_string = "'' "
+        else 
+            @epoch_id = "epoch_ID"
+        end
         contents = generate_slurm_header(job_name: "se_#{@obsid}",
                                          machine: "galaxy",
                                          partition: "gpuq",
                                          mins: mins,
                                          nodes: 1,
                                          output: "RTS-setup-#{@obsid}-%A.out")
+        contents << "
+echo #{@obsid} > #{@obsid}.txt
+#generate_cotter
+python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_cotter_moon.py \\
+                   --epoch_ID=#{@epoch_id} \\
+                   --flag_ants='' \\
+                   --obsid_infile=${PWD}/#{@obsid}.txt \\
+                   --sister_obsid_infile=#{@sister_obsid_infile_string} \\
+                   #{@track_moon_string} \\ 
+#generate_selfcal
+python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_qselfcal_concat_ms.py \\
+                   --epoch_ID=#{@epoch_id} \\
+                   --sourcelist=#{@srclist_code_base}#{@sourcelist} \\ 
+                   --cotter \\
+                   --selfcal=0 \\
+                   --sister_obsid_infile=#{@sister_obsid_infile_string} ${PWD}/#{@obsid}.txt
+generate_export_uvfits
+generate_image
+generate_pbcorr
+" if @cotter
         contents << "
 list_gpubox_files.py obsid.dat
 ln -sf ../gpufiles_list.dat .
@@ -438,7 +474,7 @@ srclist_by_beam.py -n 1000 \\
                    --srclist=#{@source_list} \\
                    --metafits=#{@metafits} \\
                    --order=\"distance\"
-"
+" unless @cotter 
         contents << "
 srclist_by_beam.py -n 3000 \\
                    --srclist=#{@source_list} \\
@@ -446,7 +482,7 @@ srclist_by_beam.py -n 3000 \\
                    --order=\"distance\" \\
                    --no_patch \\
                    --cutoff=30
-" if @peel
+" if @peel unless @cotter
         contents << "
 #####
 
@@ -490,11 +526,11 @@ sed -i \"s|\\(ObservationImageCentreDec=\\).*|\\1#{@obs_image_centre_dec}|\" #{E
 sed -i \"s|\\(SubBandIDs=\\).*|\\1#{@subband_ids}|\" #{ENV["USER"]}_rts_1.in
 sed -i \"s|\\(NumberOfSourcesToPeel=\\).*|\\1#{@peel_number}|\" #{ENV["USER"]}_rts_1.in
 sed -i \"s|\\(NumberOfIonoCalibrators=\\).*|\\1#{@peel_number}|\" #{ENV["USER"]}_rts_1.in
-"
+" unless @cotter
         contents << "
 sed -i \"s|\\(ObservationFrequencyBase=\\).*|\\1#{@obs_freq_base}|\" #{ENV["USER"]}_rts_0.in
 sed -i \"s|\\(ObservationFrequencyBase=\\).*|\\1#{@obs_freq_base}|\" #{ENV["USER"]}_rts_1.in
-" if @obs_freq_base
+" if @obs_freq_base unless @cotter
 
         Dir.chdir @path unless Dir.pwd == @path
         FileUtils.mkdir_p @timestamp_dir
