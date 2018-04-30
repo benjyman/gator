@@ -40,15 +40,13 @@ class String
 end
 
 def get_queue(machine:, user:)
-    #queue = `squeue -M #{machine} -u #{user} 2>&1`
-    queue = `squeue -u #{user} 2>&1`
+    queue = `squeue -M #{machine} -u #{user} 2>&1`
     # Sometimes the queue system needs a little time to think.
     while queue =~ /error/
         STDERR.puts "Slurm error, waiting 10s"
         STDERR.puts "Error: #{queue}"
         sleep 10
         queue = `squeue -M #{machine} -u #{user} 2>&1`
-        queue = `squeue -u #{user} 2>&1`
     end
 
     jobs_in_queue = queue.split("\n").map { |l| l.split[0].to_i if l =~ /^\d/ }.compact
@@ -563,18 +561,19 @@ sed -i \"s|\\(ObservationFrequencyBase=\\).*|\\1#{@obs_freq_base}|\" #{ENV["USER
     end
 
     def rts_patch(mins: 15, peel: false)
-        # Peel is allowed to be redefined here for more flexibility.
+        if !@cotter
+            # Peel is allowed to be redefined here for more flexibility.
+   
+            num_nodes = @subband_ids.split(',').length + 1
 
-        num_nodes = @subband_ids.split(',').length + 1
-
-        filename = "rts_patch.sh"
-        contents = generate_slurm_header(job_name: "pa_#{@obsid}",
-                                         machine: "galaxy",
-                                         partition: "gpuq",
-                                         mins: mins,
-                                         nodes: num_nodes,
-                                         output: "RTS-patch-#{@obsid}-%A.out")
-        contents << "
+            filename = "rts_patch.sh"
+            contents = generate_slurm_header(job_name: "pa_#{@obsid}",
+                                             machine: "galaxy",
+                                             partition: "gpuq",
+                                             mins: mins,
+                                             nodes: num_nodes,
+                                             output: "RTS-patch-#{@obsid}-%A.out")
+            contents << "
 srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_0.in
 
 /group/mwaeor/cjordan/software/plot_BPcal_128T.py
@@ -582,15 +581,26 @@ srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_0.in
 touch flagged_tiles.txt
 
 srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_0.in
-"
-        if peel
-            contents << "srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_1.in\n"
-        end
+" 
+            if peel
+                contents << "srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_1.in\n"
+            end
 
-        Dir.chdir "#{@path}/#{@timestamp_dir}" unless Dir.pwd == "#{@path}/#{@timestamp_dir}"
-        write(file: filename, contents: contents)
-        write(file: "rts_version_used.txt", contents: rts_version(@rts_path))
-        @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{filename}").match(/Submitted batch job (\d+)/)[1].to_i
+            Dir.chdir "#{@path}/#{@timestamp_dir}" unless Dir.pwd == "#{@path}/#{@timestamp_dir}"
+            write(file: filename, contents: contents)
+            write(file: "rts_version_used.txt", contents: rts_version(@rts_path))
+            @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{filename}").match(/Submitted batch job (\d+)/)[1].to_i
+        else
+            Dir.chdir "#{@path}/#{@timestamp_dir}" unless Dir.pwd == "#{@path}/#{@timestamp_dir}"
+            cotter_filename = "q_cotter_moon_0.sh"
+            @cotter_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{cotter_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+            selfcal_filename = "q_selfcal_moon.sh"
+            @selfcal_jobid = sbatch("--dependency=afterok:#{@cotter_jobid} #{selfcal_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+            ionpeel_filename = "q_ionpeel_moon.sh"
+            @ionpeel_jobid = sbatch("--dependency=afterok:#{@selfcal_jobid} #{ionpeel_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+            export_uvfits_filename = "q_export_uvfits_0.sh"
+            @export_uvfits_jobid = sbatch("--dependency=afterok:#{@ionpeel_jobid} #{export_uvfits_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+        end
     end
 
     def rts_peel(mins: 30)
