@@ -40,13 +40,15 @@ class String
 end
 
 def get_queue(machine:, user:)
-    queue = `squeue -M #{machine} -u #{user} 2>&1`
+    #queue = `squeue -M #{machine} -u #{user} 2>&1`
+    queue = `squeue -u #{user} 2>&1`
     # Sometimes the queue system needs a little time to think.
     while queue =~ /error/
         STDERR.puts "Slurm error, waiting 10s"
         STDERR.puts "Error: #{queue}"
         sleep 10
         queue = `squeue -M #{machine} -u #{user} 2>&1`
+        queue = `squeue -u #{user} 2>&1`
     end
 
     jobs_in_queue = queue.split("\n").map { |l| l.split[0].to_i if l =~ /^\d/ }.compact
@@ -448,17 +450,29 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    --flag_ants='' \\
                    --obsid_infile=${PWD}/#{@obsid}.txt \\
                    --sister_obsid_infile=#{@sister_obsid_infile_string} \\
-                   #{@track_moon_string} \\ 
+                   #{@track_moon_string} \\
+                   /
 #generate_selfcal
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_qselfcal_concat_ms.py \\
                    --epoch_ID=#{@epoch_id} \\
-                   --sourcelist=#{@srclist_code_base}#{@sourcelist} \\ 
+                   --sourcelist=#{@srclist_code_base}#{@sourcelist} \\
                    --cotter \\
                    --selfcal=0 \\
-                   --sister_obsid_infile=#{@sister_obsid_infile_string} ${PWD}/#{@obsid}.txt
-generate_export_uvfits
-generate_image
-generate_pbcorr
+                   --obsid_infile=${PWD}/#{@obsid}.txt \\
+                   --sister_obsid_infile=#{@sister_obsid_infile_string} \\
+                   /
+#generate peel
+python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_qselfcal_concat_ms.py \\
+                   --epoch_ID=#{@epoch_id} \\
+                   --ionpeel=#{@srclist_code_base}#{@sourcelist} \\
+                   --cotter \\
+                   --selfcal=0 \\
+                   --obsid_infile=${PWD}/#{@obsid}.txt \\
+                   --sister_obsid_infile=#{@sister_obsid_infile_string} \\
+#generate_export_uvfits
+
+#generate_image
+#generate_pbcorr
 " if @cotter
         contents << "
 list_gpubox_files.py obsid.dat
