@@ -433,8 +433,10 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
             @sourcelist = "srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt" 
             @track_moon_string = "'' "
             @sister_obsid_infile_string = "'' "
+            @no_dysco_string = "--no_dysco"
         else 
             @epoch_id = "epoch_ID"
+            @no_dysco_string = "''"
         end
         contents = generate_slurm_header(job_name: "se_#{@obsid}",
                                          machine: "galaxy",
@@ -451,6 +453,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    --obsid_infile=${PWD}/#{@obsid}.txt \\
                    --sister_obsid_infile=#{@sister_obsid_infile_string} \\
                    #{@track_moon_string} \\
+                   #{@no_dysco_string} \\
                    /
 #generate_selfcal
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_qselfcal_concat_ms.py \\
@@ -469,8 +472,12 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    --selfcal=0 \\
                    --obsid_infile=${PWD}/#{@obsid}.txt \\
                    --sister_obsid_infile=#{@sister_obsid_infile_string} \\
+                   /
 #generate_export_uvfits
-
+python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_export_uvfits.py \\
+                   --epoch_ID=#{@epoch_id} \\
+                   --obsid_infile=${PWD}/#{@obsid}.txt \\
+                   /
 #generate_image
 #generate_pbcorr
 " if @cotter
