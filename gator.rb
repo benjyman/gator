@@ -40,13 +40,15 @@ class String
 end
 
 def get_queue(machine:, user:)
-    queue = `squeue -M #{machine} -u #{user} 2>&1`
+    #queue = `squeue -M #{machine} -u #{user} 2>&1`
+    queue = `squeue -u #{user} 2>&1`
     # Sometimes the queue system needs a little time to think.
     while queue =~ /error/
         STDERR.puts "Slurm error, waiting 10s"
         STDERR.puts "Error: #{queue}"
         sleep 10
-        queue = `squeue -M #{machine} -u #{user} 2>&1`
+        #queue = `squeue -M #{machine} -u #{user} 2>&1`
+        queue = `squeue -u #{user} 2>&1`
     end
 
     jobs_in_queue = queue.split("\n").map { |l| l.split[0].to_i if l =~ /^\d/ }.compact
@@ -266,14 +268,17 @@ class Obsid
 
     def initialize(obsid, path: nil)
         # "obsid" is (probably) a 10 digit string, representing the GPS timestamp
-        # of an observation collected with the MWA.
-        @obsid = obsid
+        # of an observation collected with the MWA. If this is a moon observation 
+        # then obsid is actually a pair of obsids separated by an '_': obsid_sisterobsid
+        @obsid = obsid.to_i
         if path
             @path = path
+        elsif @obsid.to_s.length == 20
+            first_obsid=@obsid.to_s[0,10]
+            @path = "#{$mwa_dir}/data/#{first_obsid}" 
         else
-            @path = "#{$mwa_dir}/data/#{obsid}"
+            @path = "#{$mwa_dir}/data/#{obsid}" 
         end
-
         @metafits = Dir.glob("#{@path}/*metafits*").sort_by { |f| File.size(f) }.last
     end
 
@@ -297,6 +302,8 @@ class Obsid
             else
                 @type = "RA=#{ra}"
             end
+        elsif read_fits_key(fits: @metafits, key: "PROJECT").include? "G0017"
+            @type = "moon"
         # Everything else.
         else
             @type = "RA=#{ra}"
@@ -328,12 +335,14 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
             peel_number: 1000,
             timestamp: true,
             srclist: "#{ENV["SRCLIST_ROOT"]}/srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt",
-            rts_path: "rts_gpu")
+            rts_path: "rts_gpu",
+            database: "epochID_chan_onoffmoon")
         if peel and not patch
             abort "Cannot peel if we are not patching; exiting."
         end
         @patch = patch
         @peel = peel
+        @database = database
 
         @metafits = Dir.glob("#{@path}/*metafits*").sort_by { |f| File.size(f) }.last
         abort("#{@obsid}: metafits file not found!") unless metafits
@@ -425,16 +434,59 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
                   )
         @cotter = cotter
         @ben_code_base = ben_code_base
+        @have_beam_string = ""
         if @type == "EOR2"
             @epoch_id = "2014A_EoR2_gp13"
             @srclist_code_base = "/group/mwa/software/srclists/master/"
             @sourcelist = "srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt" 
-            @track_moon_string = "'' "
-            @sister_obsid_infile_string = "'' "
+            @track_moon_string = ""
+            @sister_obsid_infile_string = ""
             @no_dysco_string = "--no_dysco"
+            @ionpeeled_string = "--ionpeeled"
+        elsif @type == "moon"
+            #for moon obs the database must be specified and named according to the convention: epochID_centrechan_onoffmoon e.g. 2015A_01_69_on_moon.sqlite
+            database_name_list = File.basename(@database).split("_")
+            @epoch_id = database_name_list[0]+"_"+database_name_list[1]
+            centre_chan = database_name_list[2]
+            onoffmoon = database_name_list[3]
+            if onoffmoon == "on"
+                @track_moon_string = "--track_moon"
+            elsif onoffmoon == "off"
+                @track_moon_string = "--track_off_moon"
+            else
+                print "bad on off moon string in db name"      
+            end
+            @main_obsid = @obsid.to_s[0,10]
+            @sister_obsid = @obsid.to_s[10...20] 
+            @sister_obsid_infile_string = "--sister_obsid_infile=${PWD}/#{@sister_obsid}.txt"
+            @srclist_code_base = "/group/mwa/software/srclists/master/"
+            @sourcelist = "srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt"
+            @no_dysco_string = ""
+            @ionpeeled_string = ""
         else 
+            @srclist_code_base = "/group/mwa/software/srclists/master/"
+            @sourcelist = "srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt"
+            @track_moon_string = ""
+            @sister_obsid_infile_string = ""
             @epoch_id = "epoch_ID"
-            @no_dysco_string = "''"
+            @no_dysco_string = ""
+            @ionpeeled_string = ""
+        end
+        #things that depend on obs semester
+        obs_semester=@epoch_id.to_s[0,5]
+        puts obs_semester 
+        if obs_semester=='2015A' or obs_semester=='2015B'
+            time_averaging='8'
+            freq_averaging='80'
+            imsize_string='--imsize=2048'
+            wsclean_options_string='--wsclean_options=" -niter 0 -datacolumn CORRECTED_DATA  -scale 0.0085 -weight uniform  -smallinversion  -channelsout 24 -make-psf  "'
+        elsif obs_semester=='2017B' or obs_semester=='2018A'
+            time_averaging='4'
+            freq_averaging='40'
+            imsize_string='--imsize=4096'
+            wsclean_options_string='" -niter 0  -datacolumn CORRECTED_DATA  -scale 0.0042 -weight natural  -smallinversion -channelsout 24 -make-psf "'
+        else
+            puts "observing semester %s not known" % obs_semester
         end
         contents = generate_slurm_header(job_name: "se_#{@obsid}",
                                          machine: "galaxy",
@@ -443,13 +495,14 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
                                          nodes: 1,
                                          output: "RTS-setup-#{@obsid}-%A.out")
         contents << "
-echo #{@obsid} > #{@obsid}.txt
+echo #{@main_obsid} > #{@main_obsid}.txt
+echo #{@sister_obsid} > #{@sister_obsid}.txt
 #generate_cotter
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_cotter_moon.py \\
                    --epoch_ID=#{@epoch_id} \\
                    --flag_ants='' \\
-                   --obsid_infile=${PWD}/#{@obsid}.txt \\
-                   --sister_obsid_infile=#{@sister_obsid_infile_string} \\
+                   --obsid_infile=${PWD}/#{@main_obsid}.txt \\
+                   #{@sister_obsid_infile_string} \\
                    #{@track_moon_string} \\
                    #{@no_dysco_string} \\
                    /
@@ -459,25 +512,50 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    --sourcelist=#{@srclist_code_base}#{@sourcelist} \\
                    --cotter \\
                    --selfcal=0 \\
-                   --obsid_infile=${PWD}/#{@obsid}.txt \\
-                   --sister_obsid_infile=#{@sister_obsid_infile_string} \\
+                   --obsid_infile=${PWD}/#{@main_obsid}.txt \\
+                   #{@sister_obsid_infile_string} \\
                    /
-#generate peel
+" if @cotter
+        contents << "
+#generate peel 
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_qselfcal_concat_ms.py \\
                    --epoch_ID=#{@epoch_id} \\
                    --ionpeel=#{@srclist_code_base}#{@sourcelist} \\
                    --cotter \\
                    --selfcal=0 \\
-                   --obsid_infile=${PWD}/#{@obsid}.txt \\
-                   --sister_obsid_infile=#{@sister_obsid_infile_string} \\
+                   --obsid_infile=${PWD}/#{@main_obsid}.txt \\
+                   #{@sister_obsid_infile_string} \\
                    /
 #generate_export_uvfits
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_export_uvfits.py \\
                    --epoch_ID=#{@epoch_id} \\
-                   --obsid_infile=${PWD}/#{@obsid}.txt \\
+                   --obsid_infile=${PWD}/#{@main_obsid}.txt \\
+                   #{@ionpeeled_string} \\
                    /
+" if @cotter unless @type == "moon"
+        contents << "
 #generate_image
+python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_mwac_qimage_concat_ms.py \\
+                   --epoch_ID=#{@epoch_id} \\
+                   --cotter \\
+                   --no_pbcorr \\
+                   --pol='xx,xy,yx,yy' \\
+                   #{imsize_string} \\
+                   #{wsclean_options_string} \\
+                   --obsid_infile=${PWD}/#{@main_obsid}.txt \\
+                   #{@track_moon_string} \\
+                   #{@ionpeeled_string} \\
+                   /
 #generate_pbcorr
+python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_qpbcorr_multi.py  \\
+                   --epoch_ID=#{@epoch_id} \\
+                   #{@track_moon_string} \\
+                   --obsid_infile=${PWD}/#{@main_obsid}.txt \\
+                   --dirty \\
+                   --channelsout=24 \\
+                   #{@have_beam_string} \\
+                   #{@ionpeeled_string} \\
+                   /
 " if @cotter
         contents << "
 list_gpubox_files.py obsid.dat
@@ -593,13 +671,17 @@ srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_0.in
         else
             Dir.chdir "#{@path}/#{@timestamp_dir}" unless Dir.pwd == "#{@path}/#{@timestamp_dir}"
             cotter_filename = "q_cotter_moon_0.sh"
-            @cotter_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{cotter_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+            @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{cotter_filename}").match(/Submitted batch job (\d+)/)[1].to_i
             selfcal_filename = "q_selfcal_moon.sh"
-            @selfcal_jobid = sbatch("--dependency=afterok:#{@cotter_jobid} #{selfcal_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+            @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{selfcal_filename}").match(/Submitted batch job (\d+)/)[1].to_i
             ionpeel_filename = "q_ionpeel_moon.sh"
-            @ionpeel_jobid = sbatch("--dependency=afterok:#{@selfcal_jobid} #{ionpeel_filename}").match(/Submitted batch job (\d+)/)[1].to_i
-            export_uvfits_filename = "q_export_uvfits_0.sh"
-            @export_uvfits_jobid = sbatch("--dependency=afterok:#{@ionpeel_jobid} #{export_uvfits_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+            @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{ionpeel_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="EOR2"
+            export_uvfits_filename = "q_export_uvfits_0.sh" 
+            @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{export_uvfits_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="EOR2"
+            image_filename = "q_image_moon.sh" 
+            @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{image_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="moon"
+            pbcorr_filename = "q_pbcorr_moon.sh"             
+            @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{pbcorr_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="moon"
         end
     end
 

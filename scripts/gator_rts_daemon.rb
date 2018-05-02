@@ -123,7 +123,8 @@ begin
                       peel_number: r["PeelNumber"],
                       timestamp: r["Timestamp"] == 1 ? true : false,
                       srclist: $srclist,
-                      rts_path: $rts_path)
+                      rts_path: $rts_path,
+                      database: $database)
                 puts "Submitted #{obsid.to_s.blue} as #{o.setup_jobid.to_s.blue} (type: #{o.type})."
                 if o.type == "LymanA"
                     low_path = "#{o.path}/#{o.timestamp_dir}"
