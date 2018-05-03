@@ -332,6 +332,7 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
             cal_mins: 40,
             patch: true,
             peel: true,
+            cotter: false,
             peel_number: 1000,
             timestamp: true,
             srclist: "#{ENV["SRCLIST_ROOT"]}/srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt",
@@ -342,6 +343,7 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
         end
         @patch = patch
         @peel = peel
+        @cotter = cotter
         @database = database
 
         @metafits = Dir.glob("#{@path}/*metafits*").sort_by { |f| File.size(f) }.last
@@ -429,36 +431,25 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
     end
 
     def rts_setup(mins: 10,
-                  cotter: true,
                   ben_code_base: "/astro/mwaeor/bmckinley/code/"
                   )
-        @cotter = cotter
         @ben_code_base = ben_code_base
         @have_beam_string = ""
+        @main_obsid = @obsid.to_s[0,10]
         if @type == "EOR2"
             @epoch_id = "2014A_EoR2_gp13"
             @srclist_code_base = "/group/mwa/software/srclists/master/"
             @sourcelist = "srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt" 
-            @track_moon_string = ""
             @sister_obsid_infile_string = ""
             @no_dysco_string = "--no_dysco"
+            @channels_out_string = '--channels_out=24'
             @ionpeeled_string = "--ionpeeled"
         elsif @type == "moon"
             #for moon obs the database must be specified and named according to the convention: epochID_centrechan_onoffmoon e.g. 2015A_01_69_on_moon.sqlite
             database_name_list = File.basename(@database).split("_")
             @epoch_id = database_name_list[0]+"_"+database_name_list[1]
             centre_chan = database_name_list[2]
-            onoffmoon = database_name_list[3]
-            if onoffmoon == "on"
-                @track_moon_string = "--track_moon"
-            elsif onoffmoon == "off"
-                @track_moon_string = "--track_off_moon"
-            else
-                print "bad on off moon string in db name"      
-            end
-            @main_obsid = @obsid.to_s[0,10]
             @sister_obsid = @obsid.to_s[10...20] 
-            @sister_obsid_infile_string = "--sister_obsid_infile=${PWD}/#{@sister_obsid}.txt"
             @srclist_code_base = "/group/mwa/software/srclists/master/"
             @sourcelist = "srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt"
             @no_dysco_string = ""
@@ -466,7 +457,6 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
         else 
             @srclist_code_base = "/group/mwa/software/srclists/master/"
             @sourcelist = "srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt"
-            @track_moon_string = ""
             @sister_obsid_infile_string = ""
             @epoch_id = "epoch_ID"
             @no_dysco_string = ""
@@ -496,26 +486,75 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
                                          output: "RTS-setup-#{@obsid}-%A.out")
         contents << "
 echo #{@main_obsid} > #{@main_obsid}.txt
+" if @cotter
+        contents << "
 echo #{@sister_obsid} > #{@sister_obsid}.txt
-#generate_cotter
+" if @type == "moon" and @cotter
+        contents << "
+#generate_cotter on moon
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_cotter_moon.py \\
                    --epoch_ID=#{@epoch_id} \\
                    --flag_ants='' \\
                    --obsid_infile=${PWD}/#{@main_obsid}.txt \\
-                   #{@sister_obsid_infile_string} \\
-                   #{@track_moon_string} \\
+                   --sister_obsid_infile=${PWD}/#{@sister_obsid}.txt \\
+                   --track_moon \\
                    #{@no_dysco_string} \\
                    /
-#generate_selfcal
+" if @type == "moon" and @cotter
+        contents << "
+#generate_cotter for sister obsid (off moon)
+python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_cotter_moon.py \\
+                   --epoch_ID=#{@epoch_id} \\
+                   --flag_ants='' \\
+                   --obsid_infile=${PWD}/#{@sister_obsid}.txt \\
+                   --sister_obsid_infile=${PWD}/#{@main_obsid}.txt \\
+                   --track_off_moon \\
+                   #{@no_dysco_string} \\
+                   /
+" if @type == "moon" and @cotter
+        contents << "
+#generate_cotter for unmoon obs
+python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_cotter_moon.py \\
+                   --epoch_ID=#{@epoch_id} \\
+                   --flag_ants='' \\
+                   --obsid_infile=${PWD}/#{@main_obsid}.txt \\
+                   #{@no_dysco_string} \\
+                   /
+" if @cotter unless @type == "moon"
+        contents << " 
+#generate_selfcal on moon
+python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_qselfcal_concat_ms.py \\
+                   --epoch_ID=#{@epoch_id} \\
+                   --track_moon \\
+                   --sourcelist=#{@srclist_code_base}#{@sourcelist} \\
+                   --cotter \\
+                   --selfcal=0 \\
+                   --obsid_infile=${PWD}/#{@main_obsid}.txt \\
+                   --sister_obsid_infile=${PWD}/#{@sister_obsid}.txt \\
+                   /
+" if @type == "moon" and @cotter
+        contents << " 
+#generate_selfcal sister obsid (off moon)
+python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_qselfcal_concat_ms.py \\
+                   --epoch_ID=#{@epoch_id} \\
+                   --track_off_moon
+                   --sourcelist=#{@srclist_code_base}#{@sourcelist} \\
+                   --cotter \\
+                   --selfcal=0 \\
+                   --obsid_infile=${PWD}/#{@sister_obsid}.txt \\
+                   --sister_obsid_infile=${PWD}/#{@main_obsid}.txt \\
+                   /
+" if @type == "moon" and @cotter
+        contents << " 
+#generate_selfcal unmoon obs
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_qselfcal_concat_ms.py \\
                    --epoch_ID=#{@epoch_id} \\
                    --sourcelist=#{@srclist_code_base}#{@sourcelist} \\
                    --cotter \\
                    --selfcal=0 \\
                    --obsid_infile=${PWD}/#{@main_obsid}.txt \\
-                   #{@sister_obsid_infile_string} \\
                    /
-" if @cotter
+" if @cotter unless @type == "moon"
         contents << "
 #generate peel 
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_qselfcal_concat_ms.py \\
@@ -531,10 +570,11 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    --epoch_ID=#{@epoch_id} \\
                    --obsid_infile=${PWD}/#{@main_obsid}.txt \\
                    #{@ionpeeled_string} \\
+                   #{@channels_out_string} \\
                    /
 " if @cotter unless @type == "moon"
         contents << "
-#generate_image
+#generate_image on moon
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_mwac_qimage_concat_ms.py \\
                    --epoch_ID=#{@epoch_id} \\
                    --cotter \\
@@ -543,20 +583,72 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    #{imsize_string} \\
                    #{wsclean_options_string} \\
                    --obsid_infile=${PWD}/#{@main_obsid}.txt \\
-                   #{@track_moon_string} \\
+                   --track_moon \\
                    #{@ionpeeled_string} \\
                    /
-#generate_pbcorr
+" if @cotter and @type == "moon"
+        contents << "
+#generate_image sister ob (off moon)
+python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_mwac_qimage_concat_ms.py \\
+                   --epoch_ID=#{@epoch_id} \\
+                   --cotter \\
+                   --no_pbcorr \\
+                   --pol='xx,xy,yx,yy' \\
+                   #{imsize_string} \\
+                   #{wsclean_options_string} \\
+                   --obsid_infile=${PWD}/#{@sister_obsid}.txt \\
+                   --track_off_moon \\
+                   #{@ionpeeled_string} \\
+                   /
+" if @cotter and @type == "moon" 
+        contents << "
+#generate_image unmoon obs
+python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_mwac_qimage_concat_ms.py \\
+                   --epoch_ID=#{@epoch_id} \\
+                   --cotter \\
+                   --no_pbcorr \\
+                   --pol='xx,xy,yx,yy' \\
+                   #{imsize_string} \\
+                   #{wsclean_options_string} \\
+                   --obsid_infile=${PWD}/#{@main_obsid}.txt \\
+                   #{@ionpeeled_string} \\
+                   /
+" if @cotter unless @type == "moon"
+        contents << "
+#generate_pbcorr on moon
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_qpbcorr_multi.py  \\
                    --epoch_ID=#{@epoch_id} \\
-                   #{@track_moon_string} \\
+                   --track_moon \\
                    --obsid_infile=${PWD}/#{@main_obsid}.txt \\
                    --dirty \\
                    --channelsout=24 \\
                    #{@have_beam_string} \\
                    #{@ionpeeled_string} \\
                    /
-" if @cotter
+" if @cotter and @type == "moon"
+        contents << "
+#generate_pbcorr sister obs (off moon)
+python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_qpbcorr_multi.py  \\
+                   --epoch_ID=#{@epoch_id} \\
+                   --track_off_moon \\
+                   --obsid_infile=${PWD}/#{@sister_obsid}.txt \\
+                   --dirty \\
+                   --channelsout=24 \\
+                   #{@have_beam_string} \\
+                   #{@ionpeeled_string} \\
+                   /
+" if @cotter and @type == "moon"
+        contents << "
+#generate_pbcorr unmoon obs
+python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_qpbcorr_multi.py  \\
+                   --epoch_ID=#{@epoch_id} \\
+                   --obsid_infile=${PWD}/#{@main_obsid}.txt \\
+                   --dirty \\
+                   --channelsout=24 \\
+                   #{@have_beam_string} \\
+                   #{@ionpeeled_string} \\
+                   /
+" if @cotter unless @type == "moon"
         contents << "
 list_gpubox_files.py obsid.dat
 ln -sf ../gpufiles_list.dat .
@@ -670,17 +762,32 @@ srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_0.in
             @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{filename}").match(/Submitted batch job (\d+)/)[1].to_i
         else
             Dir.chdir "#{@path}/#{@timestamp_dir}" unless Dir.pwd == "#{@path}/#{@timestamp_dir}"
-            cotter_filename = "q_cotter_moon_0.sh"
+            cotter_filename = "q_cotter_moon_0.sh" unless @type == "moon"
+            cotter_filename = "q_cotter_on_moon_0.sh" if @type == "moon"
             @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{cotter_filename}").match(/Submitted batch job (\d+)/)[1].to_i
-            selfcal_filename = "q_selfcal_moon.sh"
+            cotter_filename = "q_cotter_off_moon_0.sh" if @type == "moon"
+            @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{cotter_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type == "moon"
+            selfcal_filename = "q_selfcal_moon.sh" unless @type == "moon"
+            selfcal_filename = "q_selfcal_on_moon.sh" if @type == "moon"
             @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{selfcal_filename}").match(/Submitted batch job (\d+)/)[1].to_i
-            ionpeel_filename = "q_ionpeel_moon.sh"
+            selfcal_filename = "q_selfcal_off_moon.sh" if @type == "moon" if @type == "moon"
+            @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{selfcal_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type == "moon"
+            ionpeel_filename = "q_ionpeel_moon.sh" unless @type == "moon"
+            ionpeel_filename = "q_ionpeel_on_moon.sh" if @type == "moon"
             @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{ionpeel_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="EOR2"
+            #ionpeel_filename = "q_ionpeel_off_moon.sh" if @type == "moon" 
+            #@patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{ionpeel_filename}").match(/Submitted batch job (\d+)/)[1].to_i 
             export_uvfits_filename = "q_export_uvfits_0.sh" 
             @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{export_uvfits_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="EOR2"
-            image_filename = "q_image_moon.sh" 
+            image_filename = "q_image_moon.sh" unless @type == "moon"
+            image_filename = "q_image_on_moon.sh" if @type == "moon"
             @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{image_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="moon"
-            pbcorr_filename = "q_pbcorr_moon.sh"             
+            image_filename = "q_image_off_moon.sh" if @type == "moon"
+            @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{image_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="moon"
+            pbcorr_filename = "q_pbcorr_moon.sh" unless @type == "moon"
+            pbcorr_filename = "q_pbcorr_on_moon.sh" if @type == "moon"            
+            @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{pbcorr_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="moon"
+            pbcorr_filename = "q_pbcorr_off_moon.sh" if @type == "moon" 
             @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{pbcorr_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="moon"
         end
     end

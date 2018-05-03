@@ -37,6 +37,9 @@ OptionParser.new do |opts|
 
     $rts_path = `which rts_gpu`.strip
 	opts.on("--rts_path", "Specify the path to the RTS executable. Default: #{$rts_path}") {|o| $rts_path = o}
+
+    $cotter = false
+        opts.on("--cotter", "Enable cotter processing. Default: #{$peel}") {$peel = true}
 end.parse!
 
 abort("$MWA_DIR not defined.") unless ENV["MWA_DIR"]
@@ -120,6 +123,7 @@ begin
                       cal_mins: $run_time,
                       patch: r["Patch"] == 1 ? true : false,
                       peel: r["Peel"] == 1 ? true : false,
+                      cotter: r["Cotter"] == 1 ? true : false,
                       peel_number: r["PeelNumber"],
                       timestamp: r["Timestamp"] == 1 ? true : false,
                       srclist: $srclist,
