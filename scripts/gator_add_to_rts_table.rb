@@ -35,7 +35,7 @@ abort("$USER not defined.") unless ENV["USER"]
 $table_name = "downloads"
 
 
-def insert_row(database, obsid, path)
+def insert_row(database, obsid, path, sister_obsid)
     database.execute "INSERT INTO #{$table_name}
                       VALUES(null,
                              #{obsid},
@@ -51,14 +51,15 @@ def insert_row(database, obsid, path)
                              #{$peel_number},
                              ' ',
                              ' ',
-                             ' ')"
+                             ' ',
+                             #{sister_obsid})"
 end
 
 if File.exists?($database)
     db = SQLite3::Database.open $database
 else
     db = SQLite3::Database.new $database
-    db.execute "CREATE TABLE #{$table_name}(id INTEGER PRIMARY KEY, Obsid INTEGER, Path TEXT, Status TEXT, LastChecked TEXT, SetupJobID INTEGER, RTSJobID INTEGER, Stdout TEXT, Timestamp INTEGER, Patch INTEGER, Peel INTEGER, PeelNumber INTEGER, IonoMagnitude TEXT, IonoPCA TEXT, IonoQA TEXT)"
+    db.execute "CREATE TABLE #{$table_name}(id INTEGER PRIMARY KEY, Obsid INTEGER, Path TEXT, Status TEXT, LastChecked TEXT, SetupJobID INTEGER, RTSJobID INTEGER, Stdout TEXT, Timestamp INTEGER, Patch INTEGER, Peel INTEGER, PeelNumber INTEGER, IonoMagnitude TEXT, IonoPCA TEXT, IonoQA TEXT, SisterObsid INTEGER)"
 end
 db.results_as_hash = true
 
@@ -67,7 +68,7 @@ db.results_as_hash = true
 # Hash?
 obsids_in_table = db.execute("SELECT * FROM #{$table_name}").map {|r| r["Obsid"]}
 obtain_obsids(ARGV).each do |o|
-    if obsids_in_table.include? o
+    if obsids_in_table.include? o.to_s[0,10].to_i
         puts "Already in database: #{o}"
         next
     end
@@ -77,10 +78,14 @@ obtain_obsids(ARGV).each do |o|
     obj.obs_type
     if obj.type == "LymanA"
         # One for high and low.
-        insert_row(db, o, "high")
-        insert_row(db, o, "low")
-    else
-        insert_row(db, o, " ")
+        insert_row(db, o, "high", null)
+        insert_row(db, o, "low", null)
+    elsif obj.type == "moon"
+        main_obsid = o.to_s[0,10].to_i
+        sister_obsid = o.to_s[10,20].to_i
+        insert_row(db, main_obsid, " ",sister_obsid)
+    else 
+        insert_row(db, o, " ", null)
     end
     puts "Added: #{o}"
 end

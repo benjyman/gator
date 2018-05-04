@@ -30,7 +30,9 @@ begin
         if options[:verbose]
             puts r
         else
-            puts "#{r["Obsid"]} \t #{r["Status"]} \t #{r["LastChecked"]} \t #{r["Stdout"]}"
+            obsid_int=r["Obsid"].to_i
+            #puts "#{r["Obsid"]} \t #{r["Status"]} \t #{r["LastChecked"]} \t #{r["Stdout"]}"
+            puts "#{obsid_int} \t #{r["Status"]} \t #{r["LastChecked"]} \t #{r["Stdout"]}"
         end
         count += 1
         break if count > $rows

@@ -39,7 +39,7 @@ OptionParser.new do |opts|
 	opts.on("--rts_path", "Specify the path to the RTS executable. Default: #{$rts_path}") {|o| $rts_path = o}
 
     $cotter = false
-        opts.on("--cotter", "Enable cotter processing. Default: #{$peel}") {$peel = true}
+        opts.on("--cotter", "Enable cotter processing. Default: #{$cotter}") {$cotter = true}
 end.parse!
 
 abort("$MWA_DIR not defined.") unless ENV["MWA_DIR"]
@@ -123,12 +123,13 @@ begin
                       cal_mins: $run_time,
                       patch: r["Patch"] == 1 ? true : false,
                       peel: r["Peel"] == 1 ? true : false,
-                      cotter: r["Cotter"] == 1 ? true : false,
+                      cotter: $cotter,
                       peel_number: r["PeelNumber"],
                       timestamp: r["Timestamp"] == 1 ? true : false,
                       srclist: $srclist,
                       rts_path: $rts_path,
-                      database: $database)
+                      database: $database,
+                      sister_obsid: r["SisterObsid"])
                 puts "Submitted #{obsid.to_s.blue} as #{o.setup_jobid.to_s.blue} (type: #{o.type})."
                 if o.type == "LymanA"
                     low_path = "#{o.path}/#{o.timestamp_dir}"

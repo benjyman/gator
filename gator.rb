@@ -85,7 +85,7 @@ end
 def obtain_obsids(argv)
     # This function parses inputs, determining if they're actually obsids or
     # files containing obsids.
-    def check_and_push(obsids, obsid)
+    def check_and_push(obsids, obsid)  
         return if obsid.strip.empty? or obsid.to_i == 0
         obsids.push(obsid.to_i)
     end
@@ -264,7 +264,8 @@ class Obsid
                 :final,
                 :rts_path,
                 :stdout_log,
-                :node001_log
+                :node001_log,
+                :sister_obsid
 
     def initialize(obsid, path: nil)
         # "obsid" is (probably) a 10 digit string, representing the GPS timestamp
@@ -337,7 +338,8 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
             timestamp: true,
             srclist: "#{ENV["SRCLIST_ROOT"]}/srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt",
             rts_path: "rts_gpu",
-            database: "epochID_chan_onoffmoon")
+            database: "epochID_chan_onoffmoon",
+            sister_obsid: null)
         if peel and not patch
             abort "Cannot peel if we are not patching; exiting."
         end
@@ -345,6 +347,7 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
         @peel = peel
         @cotter = cotter
         @database = database
+        @sister_obsid = sister_obsid
 
         @metafits = Dir.glob("#{@path}/*metafits*").sort_by { |f| File.size(f) }.last
         abort("#{@obsid}: metafits file not found!") unless metafits
@@ -449,7 +452,10 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
             database_name_list = File.basename(@database).split("_")
             @epoch_id = database_name_list[0]+"_"+database_name_list[1]
             centre_chan = database_name_list[2]
-            @sister_obsid = @obsid.to_s[10...20] 
+            #@sister_obsid = @obsid.to_s[10...20] 
+            puts "OBSID and SISTER OBSID:"
+            puts @obsid.to_s
+            puts @sister_obsid
             @srclist_code_base = "/group/mwa/software/srclists/master/"
             @sourcelist = "srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt"
             @no_dysco_string = ""
@@ -508,7 +514,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    --flag_ants='' \\
                    --obsid_infile=${PWD}/#{@sister_obsid}.txt \\
                    --sister_obsid_infile=${PWD}/#{@main_obsid}.txt \\
-                   --track_off_moon \\
+                   --track_off_moon=#{@path}/track_off_moon_#{@main_obsid}_#{@sister_obsid}.txt \\
                    #{@no_dysco_string} \\
                    /
 " if @type == "moon" and @cotter
@@ -537,7 +543,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
 #generate_selfcal sister obsid (off moon)
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_qselfcal_concat_ms.py \\
                    --epoch_ID=#{@epoch_id} \\
-                   --track_off_moon
+                   --track_off_moon=#{@path}/track_off_moon_#{@main_obsid}_#{@sister_obsid}.txt \\
                    --sourcelist=#{@srclist_code_base}#{@sourcelist} \\
                    --cotter \\
                    --selfcal=0 \\
@@ -597,7 +603,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    #{imsize_string} \\
                    #{wsclean_options_string} \\
                    --obsid_infile=${PWD}/#{@sister_obsid}.txt \\
-                   --track_off_moon \\
+                   --track_off_moon=#{@path}/track_off_moon_#{@main_obsid}_#{@sister_obsid}.txt \\
                    #{@ionpeeled_string} \\
                    /
 " if @cotter and @type == "moon" 
@@ -630,7 +636,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
 #generate_pbcorr sister obs (off moon)
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_qpbcorr_multi.py  \\
                    --epoch_ID=#{@epoch_id} \\
-                   --track_off_moon \\
+                   --track_off_moon=#{@path}/track_off_moon_#{@main_obsid}_#{@sister_obsid}.txt \\
                    --obsid_infile=${PWD}/#{@sister_obsid}.txt \\
                    --dirty \\
                    --channelsout=24 \\
