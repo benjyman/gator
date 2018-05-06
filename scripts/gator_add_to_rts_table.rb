@@ -78,14 +78,14 @@ obtain_obsids(ARGV).each do |o|
     obj.obs_type
     if obj.type == "LymanA"
         # One for high and low.
-        insert_row(db, o, "high", null)
-        insert_row(db, o, "low", null)
+        insert_row(db, o, "high", 0)
+        insert_row(db, o, "low", 0)
     elsif obj.type == "moon"
         main_obsid = o.to_s[0,10].to_i
         sister_obsid = o.to_s[10,20].to_i
         insert_row(db, main_obsid, " ",sister_obsid)
     else 
-        insert_row(db, o, " ", null)
+        insert_row(db, o, " ", 0)
     end
     puts "Added: #{o}"
 end
