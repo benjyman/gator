@@ -300,11 +300,16 @@ class Obsid
                 @type = "EOR2"
             elsif filename.include? "LymanA"
                 @type = "LymanA"
+            elsif filename.include? "CenA"
+                @type = "CenA"
             else
                 @type = "RA=#{ra}"
             end
         elsif read_fits_key(fits: @metafits, key: "PROJECT").include? "G0017"
             @type = "moon"
+        #CenA obs 
+        elsif filename.include? "CenA"
+            @type = "CenA"
         # Everything else.
         else
             @type = "RA=#{ra}"
@@ -460,6 +465,15 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
             @sourcelist = "srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt"
             @no_dysco_string = ""
             @ionpeeled_string = ""
+        elsif @type == "CenA"
+            @srclist_code_base = "/group/mwa/software/anoko/mwa-reduce/models/"
+            @sourcelist = "model-CenA-50comp_withalpha.txt"
+            @sister_obsid_infile_string = ""
+            #For CenA obs be sure to name the database starting with the observing semester eg 2015B_CenA_93.sqlite or something
+            database_name_list = File.basename(@database).split("_")
+            @epoch_id = database_name_list[0]
+            @no_dysco_string = ""
+            @ionpeeled_string = ""
         else 
             @srclist_code_base = "/group/mwa/software/srclists/master/"
             @sourcelist = "srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt"
@@ -475,12 +489,21 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
             time_averaging='8'
             freq_averaging='80'
             imsize_string='--imsize=2048'
-            wsclean_options_string='--wsclean_options=" -niter 0 -datacolumn CORRECTED_DATA  -scale 0.0085 -weight uniform  -smallinversion  -channelsout 24 -make-psf  "'
+            if @type == "moon" 
+                wsclean_options_string='--wsclean_options=" -niter 0 -datacolumn CORRECTED_DATA  -scale 0.0085 -weight uniform  -smallinversion  -channelsout 24 -make-psf  "'
+            else
+                wsclean_options_string='--wsclean_options=" -niter 2000 -threshold 1.5 -multiscale -mgain 0.85 -joinpolarizations -datacolumn CORRECTED_DATA  -scale 0.0085 -weight briggs 0  -smallinversion  -channelsout 1 -make-psf  "'
+            end
+
         elsif obs_semester=='2017B' or obs_semester=='2018A'
             time_averaging='4'
             freq_averaging='40'
             imsize_string='--imsize=4096'
-            wsclean_options_string='" -niter 0  -datacolumn CORRECTED_DATA  -scale 0.0042 -weight natural  -smallinversion -channelsout 24 -make-psf "'
+            if @type == "moon"
+                wsclean_options_string='" -niter 0  -datacolumn CORRECTED_DATA  -scale 0.0042 -weight natural  -smallinversion -channelsout 24 -make-psf "'
+            else
+                wsclean_options_string='--wsclean_options=" -niter 2000 -threshold 1.5 -multiscale -mgain 0.85 -joinpolarizations -datacolumn CORRECTED_DATA  -scale 0.0042 -weight natural  -smallinversion  -channelsout 1 -make-psf  "'
+            end
         else
             puts "observing semester %s not known" % obs_semester
         end
@@ -578,7 +601,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    #{@ionpeeled_string} \\
                    #{@channels_out_string} \\
                    /
-" if @cotter unless @type == "moon"
+" if @cotter and @type == "EOR2"
         contents << "
 #generate_image on moon
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_mwac_qimage_concat_ms.py \\
