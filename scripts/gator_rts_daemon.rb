@@ -129,7 +129,7 @@ begin
                       srclist: $srclist,
                       rts_path: $rts_path,
                       database: $database,
-                      sister_obsid: r["SisterObsid"]
+                      sister_obsid: r["SisterObsid"],
                       epoch_id: r["EpochID"])
                 puts "Submitted #{obsid.to_s.blue} as #{o.setup_jobid.to_s.blue} (type: #{o.type})."
                 if o.type == "LymanA"
