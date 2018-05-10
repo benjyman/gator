@@ -26,6 +26,9 @@ OptionParser.new do |opts|
 
     $peel = true
 	opts.on("--peel", "Disable the peel step. Default: #{$peel}") {$peel = false}
+
+    $epoch_id = "EPOCH_ID"
+        opts.on("-epoch_id", "--epoch_id EPOCH_ID", "Specify the epoch_ID of these observations. Default: #{$epoch_id}") {|o| $epoch_id = o}
 end.parse!
 
 abort("$MYGROUP not defined.") unless ENV["MYGROUP"]
@@ -35,7 +38,7 @@ abort("$USER not defined.") unless ENV["USER"]
 $table_name = "downloads"
 
 
-def insert_row(database, obsid, path, sister_obsid)
+def insert_row(database, obsid, path, sister_obsid, epoch_id)
     database.execute "INSERT INTO #{$table_name}
                       VALUES(null,
                              #{obsid},
@@ -52,14 +55,15 @@ def insert_row(database, obsid, path, sister_obsid)
                              ' ',
                              ' ',
                              ' ',
-                             #{sister_obsid})"
+                             #{sister_obsid}
+                             #{$epoch_id})"
 end
 
 if File.exists?($database)
     db = SQLite3::Database.open $database
 else
     db = SQLite3::Database.new $database
-    db.execute "CREATE TABLE #{$table_name}(id INTEGER PRIMARY KEY, Obsid INTEGER, Path TEXT, Status TEXT, LastChecked TEXT, SetupJobID INTEGER, RTSJobID INTEGER, Stdout TEXT, Timestamp INTEGER, Patch INTEGER, Peel INTEGER, PeelNumber INTEGER, IonoMagnitude TEXT, IonoPCA TEXT, IonoQA TEXT, SisterObsid INTEGER)"
+    db.execute "CREATE TABLE #{$table_name}(id INTEGER PRIMARY KEY, Obsid INTEGER, Path TEXT, Status TEXT, LastChecked TEXT, SetupJobID INTEGER, RTSJobID INTEGER, Stdout TEXT, Timestamp INTEGER, Patch INTEGER, Peel INTEGER, PeelNumber INTEGER, IonoMagnitude TEXT, IonoPCA TEXT, IonoQA TEXT, SisterObsid INTEGER, EpochID TEXT)"
 end
 db.results_as_hash = true
 
@@ -78,14 +82,14 @@ obtain_obsids(ARGV).each do |o|
     obj.obs_type
     if obj.type == "LymanA"
         # One for high and low.
-        insert_row(db, o, "high", 0)
-        insert_row(db, o, "low", 0)
+        insert_row(db, o, "high", 0, $epoch_id)
+        insert_row(db, o, "low", 0, $epoch_id)
     elsif obj.type == "moon"
         main_obsid = o.to_s[0,10].to_i
         sister_obsid = o.to_s[10,20].to_i
-        insert_row(db, main_obsid, " ",sister_obsid)
+        insert_row(db, main_obsid, " ",sister_obsid, $epoch_id)
     else 
-        insert_row(db, o, " ", 0)
+        insert_row(db, o, " ", 0, $epoch_id)
     end
-    puts "Added: #{o}"
+    puts "Added: #{o} with epoch_ID: #{$epoch_id}"
 end

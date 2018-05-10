@@ -265,7 +265,8 @@ class Obsid
                 :rts_path,
                 :stdout_log,
                 :node001_log,
-                :sister_obsid
+                :sister_obsid,
+                :epoch_id
 
     def initialize(obsid, path: nil)
         # "obsid" is (probably) a 10 digit string, representing the GPS timestamp
@@ -343,8 +344,8 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
             timestamp: true,
             srclist: "#{ENV["SRCLIST_ROOT"]}/srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt",
             rts_path: "rts_gpu",
-            database: "epochID_chan_onoffmoon",
-            sister_obsid: null)
+            sister_obsid: null,
+            epoch_id: null)
         if peel and not patch
             abort "Cannot peel if we are not patching; exiting."
         end
@@ -353,6 +354,7 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
         @cotter = cotter
         @database = database
         @sister_obsid = sister_obsid
+        @epoch_id = epoch_id
 
         @metafits = Dir.glob("#{@path}/*metafits*").sort_by { |f| File.size(f) }.last
         abort("#{@obsid}: metafits file not found!") unless metafits
@@ -453,9 +455,6 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
             @channels_out_string = '--channels_out=24'
             @ionpeeled_string = "--ionpeeled"
         elsif @type == "moon"
-            #for moon obs the database must be specified and named according to the convention: epochID_centrechan_onoffmoon e.g. 2015A_01_69_on_moon.sqlite
-            database_name_list = File.basename(@database).split("_")
-            @epoch_id = database_name_list[0]+"_"+database_name_list[1]
             centre_chan = database_name_list[2]
             #@sister_obsid = @obsid.to_s[10...20] 
             puts "OBSID and SISTER OBSID:"
