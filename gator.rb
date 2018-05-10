@@ -352,7 +352,6 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
         @patch = patch
         @peel = peel
         @cotter = cotter
-        @database = database
         @sister_obsid = sister_obsid
         @epoch_id = epoch_id
 
@@ -455,7 +454,6 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
             @channels_out_string = '--channels_out=24'
             @ionpeeled_string = "--ionpeeled"
         elsif @type == "moon"
-            centre_chan = database_name_list[2]
             #@sister_obsid = @obsid.to_s[10...20] 
             puts "OBSID and SISTER OBSID:"
             puts @obsid.to_s
@@ -469,15 +467,12 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
             @sourcelist = "model-CenA-50comp_withalpha.txt"
             @sister_obsid_infile_string = ""
             #For CenA obs be sure to name the database starting with the observing semester eg 2015B_CenA_93.sqlite or something
-            database_name_list = File.basename(@database).split("_")
-            @epoch_id = database_name_list[0]
             @no_dysco_string = ""
             @ionpeeled_string = ""
         else 
             @srclist_code_base = "/group/mwa/software/srclists/master/"
             @sourcelist = "srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt"
             @sister_obsid_infile_string = ""
-            @epoch_id = "epoch_ID"
             @no_dysco_string = ""
             @ionpeeled_string = ""
         end

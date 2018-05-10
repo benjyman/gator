@@ -28,7 +28,7 @@ OptionParser.new do |opts|
 	opts.on("--peel", "Disable the peel step. Default: #{$peel}") {$peel = false}
 
     $epoch_id = "EPOCH_ID"
-        opts.on("-epoch_id", "--epoch_id EPOCH_ID", "Specify the epoch_ID of these observations. Default: #{$epoch_id}") {|o| $epoch_id = o}
+        opts.on("--epoch_id EPOCH_ID", "Specify the epoch_ID of these observations. Default: #{$epoch_id}") {|o| $epoch_id = o}
 end.parse!
 
 abort("$MYGROUP not defined.") unless ENV["MYGROUP"]
@@ -55,8 +55,8 @@ def insert_row(database, obsid, path, sister_obsid, epoch_id)
                              ' ',
                              ' ',
                              ' ',
-                             #{sister_obsid}
-                             #{$epoch_id})"
+                             #{sister_obsid},
+                             '#{epoch_id}')"
 end
 
 if File.exists?($database)
@@ -82,14 +82,14 @@ obtain_obsids(ARGV).each do |o|
     obj.obs_type
     if obj.type == "LymanA"
         # One for high and low.
-        insert_row(db, o, "high", 0, $epoch_id)
-        insert_row(db, o, "low", 0, $epoch_id)
+        insert_row(db, o, "high", 0, "#{$epoch_id}")
+        insert_row(db, o, "low", 0, "#{$epoch_id}")
     elsif obj.type == "moon"
         main_obsid = o.to_s[0,10].to_i
         sister_obsid = o.to_s[10,20].to_i
-        insert_row(db, main_obsid, " ",sister_obsid, $epoch_id)
+        insert_row(db, main_obsid, " ",sister_obsid, "#{$epoch_id}")
     else 
-        insert_row(db, o, " ", 0, $epoch_id)
+        insert_row(db, o, " ", 0, "#{$epoch_id}")
     end
     puts "Added: #{o} with epoch_ID: #{$epoch_id}"
 end
