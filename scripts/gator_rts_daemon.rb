@@ -127,8 +127,7 @@ begin
                       peel_number: r["PeelNumber"],
                       timestamp: r["Timestamp"] == 1 ? true : false,
                       srclist: $srclist,
-                      rts_path: $rts_path,
-                      database: $database,
+                      rts_path: $rts_path, 
                       sister_obsid: r["SisterObsid"],
                       epoch_id: r["EpochID"])
                 puts "Submitted #{obsid.to_s.blue} as #{o.setup_jobid.to_s.blue} (type: #{o.type})."
