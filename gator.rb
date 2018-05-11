@@ -281,6 +281,8 @@ class Obsid
         else
             @path = "#{$mwa_dir}/data/#{obsid}" 
         end
+        #get the latest meatfits file
+        get_metafits=`wget -O #{@path}/#{obsid}_metafits_ppds.fits http://mwa-metadata01.pawsey.org.au/metadata/fits?obs_id=#{obsid}`
         @metafits = Dir.glob("#{@path}/*metafits*").sort_by { |f| File.size(f) }.last
     end
 
@@ -303,6 +305,8 @@ class Obsid
                 @type = "LymanA"
             elsif filename.include? "CenA"
                 @type = "CenA"
+            elsif filename.include? "HydA"
+                @type = "HydA"
             else
                 @type = "RA=#{ra}"
             end
@@ -311,6 +315,9 @@ class Obsid
         #CenA obs 
         elsif filename.include? "CenA"
             @type = "CenA"
+        #HydA obs 
+        elsif filename.include? "HydA"
+            @type = "HydA"
         # Everything else.
         else
             @type = "RA=#{ra}"
@@ -466,7 +473,12 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
             @srclist_code_base = "/group/mwa/software/anoko/mwa-reduce/models/"
             @sourcelist = "model-CenA-50comp_withalpha.txt"
             @sister_obsid_infile_string = ""
-            #For CenA obs be sure to name the database starting with the observing semester eg 2015B_CenA_93.sqlite or something
+            @no_dysco_string = ""
+            @ionpeeled_string = ""
+        elsif @type == "HydA"
+            @srclist_code_base = "/group/mwa/software/anoko/mwa-reduce/models/"
+            @sourcelist = "model-HydA-58comp_withalpha.txt"
+            @sister_obsid_infile_string = ""
             @no_dysco_string = ""
             @ionpeeled_string = ""
         else 
