@@ -282,7 +282,7 @@ class Obsid
             @path = "#{$mwa_dir}/data/#{obsid}" 
         end
         #get the latest meatfits file
-        get_metafits=`wget -O #{@path}/#{obsid}_metafits_ppds.fits http://mwa-metadata01.pawsey.org.au/metadata/fits?obs_id=#{obsid}`
+        get_metafits=`wget -O #{@path}/#{obsid}_metafits_ppds.fits http://mwa-metadata01.pawsey.org.au/metadata/fits?obs_id=#{obsid}` unless @obsid.to_s.length == 20
         @metafits = Dir.glob("#{@path}/*metafits*").sort_by { |f| File.size(f) }.last
     end
 
@@ -439,6 +439,7 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
             @low_setup_jobid = @setup_jobid
             @low_patch_jobid = @patch_jobid
         else
+            @channel_bandwidth = 0.02 if @type == "EOR2" and @int_time == "2.0" 
             # This is for all other "non-special" fields, including EoR fields.
             @subband_ids = (1..24).to_a.join(',')
             rts_setup(mins: setup_mins)
@@ -492,6 +493,7 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
         obs_semester=@epoch_id.to_s[0,5]
         puts obs_semester 
         if obs_semester=='2015A' or obs_semester=='2015B'
+            @cleanup_string=''
             time_averaging='8'
             freq_averaging='80'
             imsize_string='--imsize=2048'
@@ -502,12 +504,14 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
             end
 
         elsif obs_semester=='2017B' or obs_semester=='2018A'
+            @cleanup_string='--cleanup'
             time_averaging='4'
             freq_averaging='40'
             imsize_string='--imsize=4096'
             if @type == "moon"
                 wsclean_options_string='" -niter 0  -datacolumn CORRECTED_DATA  -scale 0.0042 -weight natural  -smallinversion -channelsout 24 -make-psf "'
             else
+                @cleanup_string=''
                 wsclean_options_string='--wsclean_options=" -niter 2000 -threshold 1.5 -multiscale -mgain 0.85 -joinpolarizations -datacolumn CORRECTED_DATA  -scale 0.0042 -weight natural  -smallinversion  -channelsout 1 -make-psf  "'
             end
         else
@@ -534,6 +538,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    --sister_obsid_infile=${PWD}/#{@sister_obsid}.txt \\
                    --track_moon \\
                    #{@no_dysco_string} \\
+                   #{@cleanup_string} \\
                    /
 " if @type == "moon" and @cotter
         contents << "
@@ -545,6 +550,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    --sister_obsid_infile=${PWD}/#{@main_obsid}.txt \\
                    --track_off_moon=#{@path}/track_off_moon_#{@main_obsid}_#{@sister_obsid}.txt \\
                    #{@no_dysco_string} \\
+                   #{@cleanup_string} \\
                    /
 " if @type == "moon" and @cotter
         contents << "
@@ -554,6 +560,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    --flag_ants='' \\
                    --obsid_infile=${PWD}/#{@main_obsid}.txt \\
                    #{@no_dysco_string} \\
+                   #{@cleanup_string} \\
                    /
 " if @cotter unless @type == "moon"
         contents << " 
@@ -659,6 +666,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    --channelsout=24 \\
                    #{@have_beam_string} \\
                    #{@ionpeeled_string} \\
+                   --array_by_chan \\
                    /
 " if @cotter and @type == "moon"
         contents << "
@@ -671,6 +679,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    --channelsout=24 \\
                    #{@have_beam_string} \\
                    #{@ionpeeled_string} \\
+                   --array_by_chan \\
                    /
 " if @cotter and @type == "moon"
         contents << "
@@ -682,6 +691,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    --channelsout=24 \\
                    #{@have_beam_string} \\
                    #{@ionpeeled_string} \\
+                   --array_by_chan \\
                    /
 " if @cotter unless @type == "moon"
         contents << "
@@ -755,6 +765,13 @@ sed -i \"s|\\(NumberOfIonoCalibrators=\\).*|\\1#{@peel_number}|\" #{ENV["USER"]}
 sed -i \"s|\\(ObservationFrequencyBase=\\).*|\\1#{@obs_freq_base}|\" #{ENV["USER"]}_rts_0.in
 sed -i \"s|\\(ObservationFrequencyBase=\\).*|\\1#{@obs_freq_base}|\" #{ENV["USER"]}_rts_1.in
 " if @obs_freq_base unless @cotter
+
+#On 2014-03-02 the correlator settings for EoR2 change from 40 kHz, 0.5 s to 20 kHz, 2 s
+#Bart's script takes care of the NumberOfChannels but not ChannelBandwidth, which must be set to 20 kHz
+        contents << "
+sed -i \"s|\\(ChannelBandwidth=\\).*|\\1#{@channel_bandwidth}|\" #{ENV["USER"]}_rts_0.in
+sed -i \"s|\\(ChannelBandwidth=\\).*|\\1#{@channel_bandwidth}|\" #{ENV["USER"]}_rts_1.in
+" if @channel_bandwidth unless @cotter
 
         Dir.chdir @path unless Dir.pwd == @path
         FileUtils.mkdir_p @timestamp_dir
