@@ -281,8 +281,10 @@ class Obsid
         else
             @path = "#{$mwa_dir}/data/#{obsid}" 
         end
-        #get the latest meatfits file
+        #get the latest metafits file if not paired moon obs
         get_metafits=`wget -O #{@path}/#{obsid}_metafits_ppds.fits http://mwa-metadata01.pawsey.org.au/metadata/fits?obs_id=#{obsid}` unless @obsid.to_s.length == 20
+        #get the latest metafits file if not paired moon obs
+        get_metafits=`wget -O #{@path}/#{first_obsid}_metafits_ppds.fits http://mwa-metadata01.pawsey.org.au/metadata/fits?obs_id=#{first_obsid}` if @obsid.to_s.length == 20
         @metafits = Dir.glob("#{@path}/*metafits*").sort_by { |f| File.size(f) }.last
     end
 
@@ -347,6 +349,7 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
             patch: true,
             peel: true,
             cotter: false,
+            cotter_only: false,
             peel_number: 1000,
             timestamp: true,
             srclist: "#{ENV["SRCLIST_ROOT"]}/srclist_pumav3_EoR0aegean_EoR1pietro+ForA.txt",
@@ -359,6 +362,7 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
         @patch = patch
         @peel = peel
         @cotter = cotter
+        @cotter_only = cotter_only
         @sister_obsid = sister_obsid
         @epoch_id = epoch_id
 
@@ -574,7 +578,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    --obsid_infile=${PWD}/#{@main_obsid}.txt \\
                    --sister_obsid_infile=${PWD}/#{@sister_obsid}.txt \\
                    /
-" if @type == "moon" and @cotter
+" if @type == "moon" and @cotter unless @cotter_only
         contents << " 
 #generate_selfcal sister obsid (off moon)
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_qselfcal_concat_ms.py \\
@@ -586,7 +590,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    --obsid_infile=${PWD}/#{@sister_obsid}.txt \\
                    --sister_obsid_infile=${PWD}/#{@main_obsid}.txt \\
                    /
-" if @type == "moon" and @cotter
+" if @type == "moon" and @cotter unless @cotter_only
         contents << " 
 #generate_selfcal unmoon obs
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_qselfcal_concat_ms.py \\
@@ -596,7 +600,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    --selfcal=0 \\
                    --obsid_infile=${PWD}/#{@main_obsid}.txt \\
                    /
-" if @cotter unless @type == "moon"
+" if @cotter unless @type == "moon" unless @cotter_only
         contents << "
 #generate peel 
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_qselfcal_concat_ms.py \\
@@ -614,7 +618,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    #{@ionpeeled_string} \\
                    #{@channels_out_string} \\
                    /
-" if @cotter and @type == "EOR2"
+" if @cotter and @type == "EOR2" unless @cotter_only
         contents << "
 #generate_image on moon
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_mwac_qimage_concat_ms.py \\
@@ -628,7 +632,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    --track_moon \\
                    #{@ionpeeled_string} \\
                    /
-" if @cotter and @type == "moon"
+" if @cotter and @type == "moon" unless @cotter_only
         contents << "
 #generate_image sister ob (off moon)
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_mwac_qimage_concat_ms.py \\
@@ -642,7 +646,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    --track_off_moon=#{@path}/track_off_moon_#{@main_obsid}_#{@sister_obsid}.txt \\
                    #{@ionpeeled_string} \\
                    /
-" if @cotter and @type == "moon" 
+" if @cotter and @type == "moon"  unless @cotter_only
         contents << "
 #generate_image unmoon obs
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_mwac_qimage_concat_ms.py \\
@@ -655,7 +659,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    --obsid_infile=${PWD}/#{@main_obsid}.txt \\
                    #{@ionpeeled_string} \\
                    /
-" if @cotter unless @type == "moon"
+" if @cotter unless @type == "moon" unless @cotter_only
         contents << "
 #generate_pbcorr on moon
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_qpbcorr_multi.py  \\
@@ -668,7 +672,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    #{@ionpeeled_string} \\
                    --array_by_chan \\
                    /
-" if @cotter and @type == "moon"
+" if @cotter and @type == "moon" unless @cotter_only
         contents << "
 #generate_pbcorr sister obs (off moon)
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_qpbcorr_multi.py  \\
@@ -681,7 +685,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    #{@ionpeeled_string} \\
                    --array_by_chan \\
                    /
-" if @cotter and @type == "moon"
+" if @cotter and @type == "moon" unless @cotter_only
         contents << "
 #generate_pbcorr unmoon obs
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_qpbcorr_multi.py  \\
@@ -693,7 +697,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    #{@ionpeeled_string} \\
                    --array_by_chan \\
                    /
-" if @cotter unless @type == "moon"
+" if @cotter unless @type == "moon" unless @cotter_only
         contents << "
 list_gpubox_files.py obsid.dat
 ln -sf ../gpufiles_list.dat .

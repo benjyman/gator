@@ -40,6 +40,8 @@ OptionParser.new do |opts|
 
     $cotter = false
         opts.on("--cotter", "Enable cotter processing. Default: #{$cotter}") {$cotter = true}
+    $cotter_only = false
+        opts.on("--cotter_only", "Only cotter the files, do no further processing. Default: #{$cotter_only}") {$cotter_only = true}
 end.parse!
 
 abort("$MWA_DIR not defined.") unless ENV["MWA_DIR"]
@@ -124,6 +126,7 @@ begin
                       patch: r["Patch"] == 1 ? true : false,
                       peel: r["Peel"] == 1 ? true : false,
                       cotter: $cotter,
+                      cotter_only: $cotter_only,
                       peel_number: r["PeelNumber"],
                       timestamp: r["Timestamp"] == 1 ? true : false,
                       srclist: $srclist,
