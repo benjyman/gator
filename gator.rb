@@ -40,15 +40,13 @@ class String
 end
 
 def get_queue(machine:, user:)
-    #queue = `squeue -M #{machine} -u #{user} 2>&1`
-    queue = `squeue -u #{user} 2>&1`
+    queue = `squeue -M #{machine} -u #{user} 2>&1`
     # Sometimes the queue system needs a little time to think.
     while queue =~ /error/
         STDERR.puts "Slurm error, waiting 10s"
         STDERR.puts "Error: #{queue}"
         sleep 10
-        #queue = `squeue -M #{machine} -u #{user} 2>&1`
-        queue = `squeue -u #{user} 2>&1`
+        queue = `squeue -M #{machine} -u #{user} 2>&1`
     end
 
     jobs_in_queue = queue.split("\n").map { |l| l.split[0].to_i if l =~ /^\d/ }.compact
