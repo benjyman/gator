@@ -169,10 +169,16 @@ end
 def check_rts_status(path: ".")
     stdout_log = Dir.glob("#{path}/RTS*.out").sort_by { |l| File.mtime(l) }.last
 
-    # If there's no log, then maybe the job didn't run.
+    # If there's no log, then maybe the job didn't run - or it is a cotter job.
     if not stdout_log
-        status = "???"
-        final = "*** no logs"
+        stokes_I_filenames=Dir.glob("#{path}/*I.fits")
+        if stokes_I_filenames.length >= 50
+           status = "peeled"
+           final = "24 stokes I images present" 
+        else
+           status = "???"
+           final = "*** no logs"
+        end
     # If it's too big, then it failed.
     elsif File.stat(stdout_log).size.to_f > 1000000
         status = "failed"
@@ -191,8 +197,14 @@ def check_rts_status(path: ".")
         # Read the latest node???.log file.
         node_log = Dir.glob("#{path}/*node*.log").sort_by { |l| File.mtime(l) }.last
         if not node_log
-            status = "???"
-            final = "*** no node logs"
+           stokes_I_filenames=Dir.glob("#{path}/*I.fits")
+           if stokes_I_filenames.length >= 50
+              status = "peeled"
+              final = "24 stokes I images present"
+           else
+              status = "???"
+              final = "*** no node logs"
+           end
         else
             # Read the last line of the log.
             final = File.readlines(node_log).last.strip
@@ -622,6 +634,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_mwac_qimage_concat_ms.py \\
                    --epoch_ID=#{@epoch_id} \\
                    --cotter \\
+                   --crop_images \\
                    --no_pbcorr \\
                    --pol='xx,xy,yx,yy' \\
                    #{imsize_string} \\
@@ -636,6 +649,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_mwac_qimage_concat_ms.py \\
                    --epoch_ID=#{@epoch_id} \\
                    --cotter \\
+                   --crop_images \\
                    --no_pbcorr \\
                    --pol='xx,xy,yx,yy' \\
                    #{imsize_string} \\
@@ -663,8 +677,8 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_qpbcorr_multi.py  \\
                    --epoch_ID=#{@epoch_id} \\
                    --track_moon \\
+                   --crop_images \\
                    --obsid_infile=${PWD}/#{@main_obsid}.txt \\
-                   --dirty \\
                    --channelsout=24 \\
                    #{@have_beam_string} \\
                    #{@ionpeeled_string} \\
@@ -677,7 +691,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    --epoch_ID=#{@epoch_id} \\
                    --track_off_moon=#{@path}/track_off_moon_#{@main_obsid}_#{@sister_obsid}.txt \\
                    --obsid_infile=${PWD}/#{@sister_obsid}.txt \\
-                   --dirty \\
+                   --crop_images \\
                    --channelsout=24 \\
                    #{@have_beam_string} \\
                    #{@ionpeeled_string} \\
@@ -689,7 +703,6 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
 python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_qpbcorr_multi.py  \\
                    --epoch_ID=#{@epoch_id} \\
                    --obsid_infile=${PWD}/#{@main_obsid}.txt \\
-                   --dirty \\
                    --channelsout=24 \\
                    #{@have_beam_string} \\
                    #{@ionpeeled_string} \\
@@ -823,9 +836,11 @@ srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_0.in
             @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{cotter_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type == "moon"
             selfcal_filename = "q_selfcal_moon.sh" unless @type == "moon"
             selfcal_filename = "q_selfcal_on_moon.sh" if @type == "moon"
-            @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{selfcal_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+            #Dont do calibration just for test
+            #@patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{selfcal_filename}").match(/Submitted batch job (\d+)/)[1].to_i
             selfcal_filename = "q_selfcal_off_moon.sh" if @type == "moon" if @type == "moon"
-            @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{selfcal_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type == "moon"
+            #Don't do calibration just for test 
+            #@patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{selfcal_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type == "moon"
             ionpeel_filename = "q_ionpeel_moon.sh" unless @type == "moon"
             ionpeel_filename = "q_ionpeel_on_moon.sh" if @type == "moon"
             @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{ionpeel_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="EOR2"
