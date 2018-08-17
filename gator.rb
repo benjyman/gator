@@ -172,7 +172,7 @@ def check_rts_status(path: ".")
     # If there's no log, then maybe the job didn't run - or it is a cotter job.
     if not stdout_log
         stokes_I_filenames=Dir.glob("#{path}/*I.fits")
-        if stokes_I_filenames.length >= 50
+        if stokes_I_filenames.length >= 48
            status = "peeled"
            final = "24 stokes I images present" 
         else
@@ -836,11 +836,9 @@ srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_0.in
             @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{cotter_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type == "moon"
             selfcal_filename = "q_selfcal_moon.sh" unless @type == "moon"
             selfcal_filename = "q_selfcal_on_moon.sh" if @type == "moon"
-            #Dont do calibration just for test
-            #@patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{selfcal_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+            @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{selfcal_filename}").match(/Submitted batch job (\d+)/)[1].to_i
             selfcal_filename = "q_selfcal_off_moon.sh" if @type == "moon" if @type == "moon"
-            #Don't do calibration just for test 
-            #@patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{selfcal_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type == "moon"
+            @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{selfcal_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type == "moon"
             ionpeel_filename = "q_ionpeel_moon.sh" unless @type == "moon"
             ionpeel_filename = "q_ionpeel_on_moon.sh" if @type == "moon"
             @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{ionpeel_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="EOR2"
