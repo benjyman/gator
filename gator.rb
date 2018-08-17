@@ -172,7 +172,7 @@ def check_rts_status(path: ".")
     # If there's no log, then maybe the job didn't run - or it is a cotter job.
     if not stdout_log
         stokes_I_filenames=Dir.glob("#{path}/*I.fits")
-        if stokes_I_filenames.length >= 48
+        if stokes_I_filenames.length >= 50
            status = "peeled"
            final = "24 stokes I images present" 
         else
