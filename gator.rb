@@ -285,11 +285,14 @@ class Obsid
         @obsid = obsid.to_i
         if path
             @path = path
+            FileUtils.mkdir_p @path unless File.directory?(@path)
         elsif @obsid.to_s.length == 20
             first_obsid=@obsid.to_s[0,10]
-            @path = "#{$mwa_dir}/data/#{first_obsid}" 
+            @path = "#{$mwa_dir}/data/#{first_obsid}"
+            FileUtils.mkdir_p @path unless File.directory?(@path)
         else
             @path = "#{$mwa_dir}/data/#{obsid}" 
+            FileUtils.mkdir_p @path unless File.directory?(@path)
         end
         #get the latest metafits file if not paired moon obs
         get_metafits=`wget -O #{@path}/#{obsid}_metafits_ppds.fits http://mwa-metadata01.pawsey.org.au/metadata/fits?obs_id=#{obsid}` unless @obsid.to_s.length == 20
