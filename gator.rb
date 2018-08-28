@@ -548,36 +548,58 @@ echo #{@sister_obsid} > #{@sister_obsid}.txt
 " if @type == "moon" and @cotter
         contents << "
 #generate_cotter on moon
-python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_cotter_moon.py \\
+#python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_cotter_moon.py \\
+#                   --epoch_ID=#{@epoch_id} \\
+#                   --flag_ants='' \\
+#                   --obsid_infile=${PWD}/#{@main_obsid}.txt \\
+#                   --sister_obsid_infile=${PWD}/#{@sister_obsid}.txt \\
+#                   --track_moon \\
+#                   #{@no_dysco_string} \\
+#                   #{@cleanup_string} \\
+#                   /
+#generate manta_ray on moon
+python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_manta_ray.py \\
                    --epoch_ID=#{@epoch_id} \\
                    --flag_ants='' \\
                    --obsid_infile=${PWD}/#{@main_obsid}.txt \\
                    --sister_obsid_infile=${PWD}/#{@sister_obsid}.txt \\
                    --track_moon \\
-                   #{@no_dysco_string} \\
-                   #{@cleanup_string} \\
-                   /
+                   / 
 " if @type == "moon" and @cotter
         contents << "
-#generate_cotter for sister obsid (off moon)
-python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_cotter_moon.py \\
+##generate_cotter for sister obsid (off moon)
+#python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_cotter_moon.py \\
+#                   --epoch_ID=#{@epoch_id} \\
+#                   --flag_ants='' \\
+#                   --obsid_infile=${PWD}/#{@sister_obsid}.txt \\
+#                   --sister_obsid_infile=${PWD}/#{@main_obsid}.txt \\
+#                   --track_off_moon=#{@path}/track_off_moon_#{@main_obsid}_#{@sister_obsid}.txt \\
+#                   #{@no_dysco_string} \\
+#                   #{@cleanup_string} \\
+#                   /
+#generate manta ray for sister obsid (off moon)
+python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_manta_ray.py \\
                    --epoch_ID=#{@epoch_id} \\
                    --flag_ants='' \\
                    --obsid_infile=${PWD}/#{@sister_obsid}.txt \\
                    --sister_obsid_infile=${PWD}/#{@main_obsid}.txt \\
                    --track_off_moon=#{@path}/track_off_moon_#{@main_obsid}_#{@sister_obsid}.txt \\
-                   #{@no_dysco_string} \\
-                   #{@cleanup_string} \\
                    /
 " if @type == "moon" and @cotter
         contents << "
-#generate_cotter for unmoon obs
-python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_cotter_moon.py \\
+##generate_cotter for unmoon obs
+#python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_cotter_moon.py \\
+#                   --epoch_ID=#{@epoch_id} \\
+#                   --flag_ants='' \\
+#                   --obsid_infile=${PWD}/#{@main_obsid}.txt \\
+#                   #{@no_dysco_string} \\
+#                   #{@cleanup_string} \\
+#                   /
+#generate manta ray for unmoon obs
+python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/generate_manta_ray.py \\
                    --epoch_ID=#{@epoch_id} \\
                    --flag_ants='' \\
                    --obsid_infile=${PWD}/#{@main_obsid}.txt \\
-                   #{@no_dysco_string} \\
-                   #{@cleanup_string} \\
                    /
 " if @cotter unless @type == "moon"
         contents << " 
