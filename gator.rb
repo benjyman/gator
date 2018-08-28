@@ -866,7 +866,6 @@ srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_0.in
             @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{manta_ray_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type == "moon"
             selfcal_filename = "q_selfcal_moon.sh" unless @type == "moon"
             selfcal_filename = "q_selfcal_on_moon.sh" if @type == "moon"
-            #Dont do cal again!
             @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{selfcal_filename}").match(/Submitted batch job (\d+)/)[1].to_i
             selfcal_filename = "q_selfcal_off_moon.sh" if @type == "moon" if @type == "moon"
             @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{selfcal_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type == "moon"
