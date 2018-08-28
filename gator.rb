@@ -832,11 +832,16 @@ srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_0.in
             @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{filename}").match(/Submitted batch job (\d+)/)[1].to_i
         else
             Dir.chdir "#{@path}/#{@timestamp_dir}" unless Dir.pwd == "#{@path}/#{@timestamp_dir}"
-            cotter_filename = "q_cotter_moon_0.sh" unless @type == "moon"
-            cotter_filename = "q_cotter_on_moon_0.sh" if @type == "moon"
-            @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{cotter_filename}").match(/Submitted batch job (\d+)/)[1].to_i
-            cotter_filename = "q_cotter_off_moon_0.sh" if @type == "moon"
-            @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{cotter_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type == "moon"
+            #cotter_filename = "q_cotter_moon_0.sh" unless @type == "moon"
+            #cotter_filename = "q_cotter_on_moon_0.sh" if @type == "moon"
+            #@patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{cotter_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+            #cotter_filename = "q_cotter_off_moon_0.sh" if @type == "moon"
+            #@patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{cotter_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type == "moon"
+            manta_ray_filename = "q_manta_ray_moon_0.sh" unless @type == "moon"
+            manta_ray_filename = "q_manta_ray_on_moon_0.sh" if @type == "moon"
+            @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{manta_ray_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+            manta_ray_filename = "q_manta_ray_off_moon_0.sh" if @type == "moon"
+            @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{manta_ray_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type == "moon"
             selfcal_filename = "q_selfcal_moon.sh" unless @type == "moon"
             selfcal_filename = "q_selfcal_on_moon.sh" if @type == "moon"
             #Dont do cal again!
