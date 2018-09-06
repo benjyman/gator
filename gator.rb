@@ -838,6 +838,7 @@ sed -i \"s|\\(ChannelBandwidth=\\).*|\\1#{@channel_bandwidth}|\" #{ENV["USER"]}_
           manta_ray_filename = "q_manta_ray_moon_0.sh"
           @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{manta_ray_filename}").match(/Submitted batch job (\d+)/)[1].to_i
        end
+    end
 
     def rts_patch(mins: 15, peel: false)
         if !@cotter
