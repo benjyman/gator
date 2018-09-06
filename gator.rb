@@ -362,6 +362,7 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
             patch: true,
             peel: true,
             cotter: false,
+            ms_download: false,
             cotter_only: false,
             peel_number: 1000,
             timestamp: true,
@@ -375,6 +376,7 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
         @patch = patch
         @peel = peel
         @cotter = cotter
+        @ms_download = ms_download
         @cotter_only = cotter_only
         @sister_obsid = sister_obsid
         @epoch_id = epoch_id
@@ -460,7 +462,11 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
             # This is for all other "non-special" fields, including EoR fields.
             @subband_ids = (1..24).to_a.join(',')
             rts_setup(mins: setup_mins)
-            rts_patch(mins: cal_mins, peel: @peel) if @patch
+            if @ms_download
+               ms_download()
+            else
+               rts_patch(mins: cal_mins, peel: @peel) if @patch
+            end
         end
     end
 
@@ -822,6 +828,16 @@ sed -i \"s|\\(ChannelBandwidth=\\).*|\\1#{@channel_bandwidth}|\" #{ENV["USER"]}_
         @setup_jobid = sbatch("rts_setup.sh").match(/Submitted batch job (\d+)/)[1].to_i
     end
 
+    def ms_download()
+       if @type == "moon"
+          p manta_ray_filename = "q_manta_ray_on_moon_0.sh"
+          p @patch_jobid_on_moon = sbatch("--dependency=afterok:#{@setup_jobid} -M zeus --partition=copyq #{manta_ray_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+          p manta_ray_filename = "q_manta_ray_off_moon_0.sh"
+          p @patch_jobid_off_moon = sbatch("--dependency=afterok:#{@setup_jobid} -M zeus --partition=copyq #{manta_ray_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+       else
+          manta_ray_filename = "q_manta_ray_moon_0.sh"
+          @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{manta_ray_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+
     def rts_patch(mins: 15, peel: false)
         if !@cotter
             # Peel is allowed to be redefined here for more flexibility.
@@ -859,33 +875,81 @@ srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_0.in
             #@patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{cotter_filename}").match(/Submitted batch job (\d+)/)[1].to_i
             #cotter_filename = "q_cotter_off_moon_0.sh" if @type == "moon"
             #@patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{cotter_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type == "moon"
-            manta_ray_filename = "q_manta_ray_moon_0.sh" unless @type == "moon"
-            manta_ray_filename = "q_manta_ray_on_moon_0.sh" if @type == "moon"
-            @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{manta_ray_filename}").match(/Submitted batch job (\d+)/)[1].to_i
-            manta_ray_filename = "q_manta_ray_off_moon_0.sh" if @type == "moon"
-            @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{manta_ray_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type == "moon"
-            selfcal_filename = "q_selfcal_moon.sh" unless @type == "moon"
-            selfcal_filename = "q_selfcal_on_moon.sh" if @type == "moon"
-            @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{selfcal_filename}").match(/Submitted batch job (\d+)/)[1].to_i
-            selfcal_filename = "q_selfcal_off_moon.sh" if @type == "moon"
-            @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{selfcal_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type == "moon"
-            ionpeel_filename = "q_ionpeel_moon.sh" unless @type == "moon"
-            ionpeel_filename = "q_ionpeel_on_moon.sh" if @type == "moon"
-            @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{ionpeel_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="EOR2"
-            #ionpeel_filename = "q_ionpeel_off_moon.sh" if @type == "moon" 
-            #@patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{ionpeel_filename}").match(/Submitted batch job (\d+)/)[1].to_i 
-            export_uvfits_filename = "q_export_uvfits_0.sh" 
-            @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{export_uvfits_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="EOR2"
-            image_filename = "q_image_moon.sh" unless @type == "moon"
-            image_filename = "q_image_on_moon.sh" if @type == "moon"
-            @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{image_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="moon"
-            image_filename = "q_image_off_moon.sh" if @type == "moon"
-            @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{image_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="moon"
-            pbcorr_filename = "q_pbcorr_moon.sh" unless @type == "moon"
-            pbcorr_filename = "q_pbcorr_on_moon.sh" if @type == "moon"            
-            @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{pbcorr_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="moon"
-            pbcorr_filename = "q_pbcorr_off_moon.sh" if @type == "moon" 
-            @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{pbcorr_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="moon"
+            if @type == "moon"
+               ##do all this downloading stuff separately...
+               #p manta_ray_filename = "q_manta_ray_on_moon_0.sh"
+               #p @patch_jobid_on_moon = sbatch("--dependency=afterok:#{@setup_jobid} -M zeus --partition=copyq #{manta_ray_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+               #p manta_ray_outfile_on_moon = "manta_ray-#{@patch_jobid_on_moon}.out"
+               #p manta_ray_filename = "q_manta_ray_off_moon_0.sh"
+               #p @patch_jobid_off_moon = sbatch("--dependency=afterok:#{@setup_jobid} -M zeus --partition=copyq #{manta_ray_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+               #p manta_ray_outfile_off_moon = "manta_ray-#{@patch_jobid_off_moon}.out"
+               #p print_string="waiting for ms downloads"
+               #outfiles_exist = false
+               #while !outfiles_exist
+               #   outfiles_exist = (File.file?(manta_ray_outfile_on_moon) and File.file?(manta_ray_outfile_off_moon))
+               #   #sleep(1) until outfiles_exist
+               #end
+               #downloads_complete = false
+               #while !downloads_complete
+               #   downloads_complete = (File.readlines(manta_ray_outfile_on_moon).grep(/mwa_client finished successfully/).any? and File.readlines(manta_ray_outfile_off_moon).grep(/mwa_client finished successfully/).any?)
+               #   #sleep(1) until outfiles_exist
+               #end
+               p selfcal_filename = "q_selfcal_on_moon.sh"
+               p @patch_jobid = sbatch("#{selfcal_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+               p selfcal_filename = "q_selfcal_off_moon.sh"
+               p @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{selfcal_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+               #ionpeel_filename = "q_ionpeel_on_moon.sh"
+               #ionpeel_filename = "q_ionpeel_off_moon.sh" if @type == "moon" 
+               #@patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{ionpeel_filename}").match(/Submitted batch job (\d+)/)[1].to_i 
+               p image_filename = "q_image_on_moon.sh"
+               p @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{image_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+               p image_filename = "q_image_off_moon.sh"
+               p @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{image_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+               p pbcorr_filename = "q_pbcorr_on_moon.sh"
+               p @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{pbcorr_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+               p pbcorr_filename = "q_pbcorr_off_moon.sh"
+               p @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{pbcorr_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+               ###
+            else
+               manta_ray_filename = "q_manta_ray_moon_0.sh"
+               @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{manta_ray_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+               selfcal_filename = "q_selfcal_moon.sh"
+               @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{selfcal_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+               ionpeel_filename = "q_ionpeel_moon.sh"
+               @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{ionpeel_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="EOR2"
+               #ionpeel_filename = "q_ionpeel_off_moon.sh" if @type == "moon" 
+               #@patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{ionpeel_filename}").match(/Submitted batch job (\d+)/)[1].to_i 
+               export_uvfits_filename = "q_export_uvfits_0.sh"
+               @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{export_uvfits_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="EOR2"
+               end
+            ##old
+            #manta_ray_filename = "q_manta_ray_moon_0.sh" unless @type == "moon"
+            #manta_ray_filename = "q_manta_ray_on_moon_0.sh" if @type == "moon"
+            #@patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{manta_ray_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+            #manta_ray_filename = "q_manta_ray_off_moon_0.sh" if @type == "moon"
+            #@patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{manta_ray_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type == "moon"
+            #selfcal_filename = "q_selfcal_moon.sh" unless @type == "moon"
+            #selfcal_filename = "q_selfcal_on_moon.sh" if @type == "moon"
+            #@patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{selfcal_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+            #selfcal_filename = "q_selfcal_off_moon.sh" if @type == "moon"
+            #@patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{selfcal_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type == "moon"
+            #ionpeel_filename = "q_ionpeel_moon.sh" unless @type == "moon"
+            #ionpeel_filename = "q_ionpeel_on_moon.sh" if @type == "moon"
+            #@patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{ionpeel_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="EOR2"
+            ##ionpeel_filename = "q_ionpeel_off_moon.sh" if @type == "moon" 
+            ##@patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{ionpeel_filename}").match(/Submitted batch job (\d+)/)[1].to_i 
+            #export_uvfits_filename = "q_export_uvfits_0.sh" 
+            #@patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{export_uvfits_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="EOR2"
+            #image_filename = "q_image_moon.sh" unless @type == "moon"
+            #image_filename = "q_image_on_moon.sh" if @type == "moon"
+            #@patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{image_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="moon"
+            #image_filename = "q_image_off_moon.sh" if @type == "moon"
+            #@patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{image_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="moon"
+            #pbcorr_filename = "q_pbcorr_moon.sh" unless @type == "moon"
+            #pbcorr_filename = "q_pbcorr_on_moon.sh" if @type == "moon"            
+            #@patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{pbcorr_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="moon"
+            #pbcorr_filename = "q_pbcorr_off_moon.sh" if @type == "moon" 
+            #@patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{pbcorr_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type=="moon"
         end
     end
 

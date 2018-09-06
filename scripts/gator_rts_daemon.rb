@@ -40,6 +40,10 @@ OptionParser.new do |opts|
 
     $cotter = false
         opts.on("--cotter", "Enable cotter processing. Default: #{$cotter}") {$cotter = true}
+
+    $ms_download = false
+        opts.on("--ms_download", "just download ms. Default: #{$ms_download}") {$ms_download = true}
+
     $cotter_only = false
         opts.on("--cotter_only", "Only cotter the files, do no further processing. Default: #{$cotter_only}") {$cotter_only = true}
 end.parse!
