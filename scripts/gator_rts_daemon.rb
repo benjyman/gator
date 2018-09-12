@@ -98,18 +98,23 @@ begin
                     puts "#{obsid.to_s.blue}: #{new_status}"
                 end
                 if new_status == "peeled"
+                    #BM dont need this iono stuff
                     # Upload the successful RTS results to the QA database.
-                    iono_mag, iono_pca, iono_qa = determine_iono_metrics(obsid: obsid,
-                                                                         path: path,
-                                                                         srclist: $srclist)
-
-                    # Update the SQLite database.
+                    #iono_mag, iono_pca, iono_qa = determine_iono_metrics(obsid: obsid,
+                    #                                                     path: path,
+                    #                                                     srclist: $srclist)
+                    #
+                    ## Update the SQLite database.
+                    #db.execute("UPDATE #{table_name}
+                    #            SET Status = '#{new_status}',
+                    #                LastChecked = '#{Time.now}',
+                    #                IonoMagnitude = '#{iono_mag}',
+                    #                IonoPCA = '#{iono_pca}',
+                    #                IonoQA = '#{iono_qa}'
+                    #            WHERE Obsid = #{obsid} AND Path = '#{path}'")
                     db.execute("UPDATE #{table_name}
                                 SET Status = '#{new_status}',
-                                    LastChecked = '#{Time.now}',
-                                    IonoMagnitude = '#{iono_mag}',
-                                    IonoPCA = '#{iono_pca}',
-                                    IonoQA = '#{iono_qa}'
+                                    LastChecked = '#{Time.now}'
                                 WHERE Obsid = #{obsid} AND Path = '#{path}'")
                 else
                     # If the new status isn't "peeled", then simply update the SQLite database.
@@ -130,6 +135,7 @@ begin
                       patch: r["Patch"] == 1 ? true : false,
                       peel: r["Peel"] == 1 ? true : false,
                       cotter: $cotter,
+                      ms_download: $ms_download,
                       cotter_only: $cotter_only,
                       peel_number: r["PeelNumber"],
                       timestamp: r["Timestamp"] == 1 ? true : false,
