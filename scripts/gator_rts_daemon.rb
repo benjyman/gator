@@ -54,7 +54,7 @@ abort("$USER not defined.") unless ENV["USER"]
 
 
 table_name = "downloads"
-max_queue_length = 12
+max_queue_length = 50
 
 
 abort("Database (#{$database}) doesn't exist!") unless File.exists?($database)
