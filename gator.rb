@@ -512,6 +512,13 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
             @no_dysco_string = ""
             @ionpeeled_string = ""
         end
+        #things that depend on epoch_ID
+        if @epoch_id=='2015B_05'
+           @flag_ants_string = "'56 60'"
+        else
+           @flag_ants_string = "''"
+        end
+
         #things that depend on obs semester
         obs_semester=@epoch_id.to_s[0,5]
         puts obs_semester 
@@ -614,6 +621,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    --epoch_ID=#{@epoch_id} \\
                    --track_moon \\
                    --sourcelist=#{@srclist_code_base}#{@sourcelist} \\
+                   --flag_ants=#{@flag_ants_string} \\
                    --cotter \\
                    --selfcal=0 \\
                    --obsid_infile=${PWD}/#{@main_obsid}.txt \\
@@ -626,6 +634,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    --epoch_ID=#{@epoch_id} \\
                    --track_off_moon=#{@path}/track_off_moon_#{@main_obsid}_#{@sister_obsid}.txt \\
                    --sourcelist=#{@srclist_code_base}#{@sourcelist} \\
+                   --flag_ants=#{@flag_ants_string} \\
                    --cotter \\
                    --selfcal=0 \\
                    --obsid_infile=${PWD}/#{@sister_obsid}.txt \\
@@ -638,6 +647,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    --epoch_ID=#{@epoch_id} \\
                    --sourcelist=#{@srclist_code_base}#{@sourcelist} \\
                    --cotter \\
+                   --flag_ants=#{@flag_ants_string} \\
                    --selfcal=0 \\
                    --obsid_infile=${PWD}/#{@main_obsid}.txt \\
                    /
@@ -831,9 +841,9 @@ sed -i \"s|\\(ChannelBandwidth=\\).*|\\1#{@channel_bandwidth}|\" #{ENV["USER"]}_
     def ms_download()
        if @type == "moon"
           p manta_ray_filename = "q_manta_ray_on_moon_0.sh"
-          p @patch_jobid_on_moon = sbatch("--dependency=afterok:#{@setup_jobid} -M zeus --partition=copyq #{manta_ray_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+          p @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} -M zeus --partition=copyq #{manta_ray_filename}").match(/Submitted batch job (\d+)/)[1].to_i
           p manta_ray_filename = "q_manta_ray_off_moon_0.sh"
-          p @patch_jobid_off_moon = sbatch("--dependency=afterok:#{@setup_jobid} -M zeus --partition=copyq #{manta_ray_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+          p @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} -M zeus --partition=copyq #{manta_ray_filename}").match(/Submitted batch job (\d+)/)[1].to_i
        else
           manta_ray_filename = "q_manta_ray_moon_0.sh"
           @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{manta_ray_filename}").match(/Submitted batch job (\d+)/)[1].to_i
