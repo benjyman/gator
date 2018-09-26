@@ -920,7 +920,7 @@ srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_0.in
                p pbcorr_filename_on_moon = "q_pbcorr_on_moon.sh"
                p @patch_jobid_on_moon = sbatch("--dependency=afterok:#{@patch_jobid_on_moon} #{pbcorr_filename_on_moon}").match(/Submitted batch job (\d+)/)[1].to_i
                p pbcorr_filename_off_moon = "q_pbcorr_off_moon.sh"
-               p @patch_jobid_off_moon = sbatch("--dependency=afterok:#{@patch_jobid_off_moon} #{pbcorr_filenamei_off_moon}").match(/Submitted batch job (\d+)/)[1].to_i
+               p @patch_jobid_off_moon = sbatch("--dependency=afterok:#{@patch_jobid_off_moon} #{pbcorr_filename_off_moon}").match(/Submitted batch job (\d+)/)[1].to_i
                ###
             else
                manta_ray_filename = "q_manta_ray_moon_0.sh"
