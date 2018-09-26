@@ -907,18 +907,18 @@ srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_0.in
                #   #sleep(1) until outfiles_exist
                #end
                p selfcal_filename_on_moon = "q_selfcal_on_moon.sh"
-               p @patch_jobid_on_moon = sbatch("--dependency=afterok:#{@setup_jobid} #{selfcal_filename_on_moon}").match(/Submitted batch job (\d+)/)[1].to_i
+               p @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{selfcal_filename_on_moon}").match(/Submitted batch job (\d+)/)[1].to_i
                p selfcal_filename_off_moon = "q_selfcal_off_moon.sh"
                p @patch_jobid_off_moon = sbatch("--dependency=afterok:#{@setup_jobid} #{selfcal_filename_off_moon}").match(/Submitted batch job (\d+)/)[1].to_i
                #ionpeel_filename = "q_ionpeel_on_moon.sh"
                #ionpeel_filename = "q_ionpeel_off_moon.sh" if @type == "moon" 
                #@patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{ionpeel_filename}").match(/Submitted batch job (\d+)/)[1].to_i 
                p image_filename_on_moon = "q_image_on_moon.sh"
-               p @patch_jobid_on_moon = sbatch("--dependency=afterok:#{@patch_jobid_on_moon} #{image_filename_on_moon}").match(/Submitted batch job (\d+)/)[1].to_i
+               p @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{image_filename_on_moon}").match(/Submitted batch job (\d+)/)[1].to_i
                p image_filename_off_moon = "q_image_off_moon.sh"
                p @patch_jobid_off_moon = sbatch("--dependency=afterok:#{@patch_jobid_off_moon} #{image_filename_off_moon}").match(/Submitted batch job (\d+)/)[1].to_i
                p pbcorr_filename_on_moon = "q_pbcorr_on_moon.sh"
-               p @patch_jobid_on_moon = sbatch("--dependency=afterok:#{@patch_jobid_on_moon} #{pbcorr_filename_on_moon}").match(/Submitted batch job (\d+)/)[1].to_i
+               p @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{pbcorr_filename_on_moon}").match(/Submitted batch job (\d+)/)[1].to_i
                p pbcorr_filename_off_moon = "q_pbcorr_off_moon.sh"
                p @patch_jobid_off_moon = sbatch("--dependency=afterok:#{@patch_jobid_off_moon} #{pbcorr_filename_off_moon}").match(/Submitted batch job (\d+)/)[1].to_i
                ###
