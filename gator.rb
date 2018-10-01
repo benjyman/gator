@@ -677,7 +677,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    --cotter \\
                    --crop_images \\
                    --no_pbcorr \\
-                   --pol='xx,xy,yx,yy' \\
+                   --pol='I' \\
                    #{imsize_string} \\
                    #{wsclean_options_string} \\
                    --obsid_infile=${PWD}/#{@main_obsid}.txt \\
@@ -692,7 +692,7 @@ python #{@ben_code_base}ben-astronomy/moon/processing_scripts/namorrodor_magnus/
                    --cotter \\
                    --crop_images \\
                    --no_pbcorr \\
-                   --pol='xx,xy,yx,yy' \\
+                   --pol='I' \\
                    #{imsize_string} \\
                    #{wsclean_options_string} \\
                    --obsid_infile=${PWD}/#{@sister_obsid}.txt \\
