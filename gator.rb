@@ -916,11 +916,12 @@ srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_0.in
                p image_filename_on_moon = "q_image_on_moon.sh"
                p @patch_jobid_on_moon = sbatch("--dependency=afterok:#{@patch_jobid_on_moon} #{image_filename_on_moon}").match(/Submitted batch job (\d+)/)[1].to_i
                p image_filename_off_moon = "q_image_off_moon.sh"
-               p @patch_jobid_off_moon = sbatch("--dependency=afterok:#{@patch_jobid_off_moon} #{image_filename_off_moon}").match(/Submitted batch job (\d+)/)[1].to_i
-               p pbcorr_filename_on_moon = "q_pbcorr_on_moon.sh"
-               p @patch_jobid_on_moon = sbatch("--dependency=afterok:#{@patch_jobid_on_moon} #{pbcorr_filename_on_moon}").match(/Submitted batch job (\d+)/)[1].to_i
-               p pbcorr_filename_off_moon = "q_pbcorr_off_moon.sh"
-               p @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid_off_moon} #{pbcorr_filename_off_moon}").match(/Submitted batch job (\d+)/)[1].to_i
+               p @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid_off_moon} #{image_filename_off_moon}").match(/Submitted batch job (\d+)/)[1].to_i
+               #don't need pbcorr step now - just make stokes I with wsclean!
+               #p pbcorr_filename_on_moon = "q_pbcorr_on_moon.sh"
+               #p @patch_jobid_on_moon = sbatch("--dependency=afterok:#{@patch_jobid_on_moon} #{pbcorr_filename_on_moon}").match(/Submitted batch job (\d+)/)[1].to_i
+               #p pbcorr_filename_off_moon = "q_pbcorr_off_moon.sh"
+               #p @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid_off_moon} #{pbcorr_filename_off_moon}").match(/Submitted batch job (\d+)/)[1].to_i
                ###
             else
                manta_ray_filename = "q_manta_ray_moon_0.sh"
