@@ -3,8 +3,8 @@ require "fileutils"
 abort("$MWA_DIR not defined.") unless ENV["MWA_DIR"]
 abort("$SRCLIST_ROOT not defined.") unless ENV["SRCLIST_ROOT"]
 $mwa_dir = ENV["MWA_DIR"].chomp('/')
-$project = ENV["PAWSEY_PROJECT"]
-
+#$project = ENV["PAWSEY_PROJECT"]
+$project = "mwaeor"
 
 class Float
     def close_to?(n, tol: 0.1)
