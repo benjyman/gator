@@ -882,11 +882,11 @@ srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_0.in
             @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{filename}").match(/Submitted batch job (\d+)/)[1].to_i
         else
             Dir.chdir "#{@path}/#{@timestamp_dir}" unless Dir.pwd == "#{@path}/#{@timestamp_dir}"
-            #cotter_filename = "q_cotter_moon_0.sh" unless @type == "moon"
-            #cotter_filename = "q_cotter_on_moon_0.sh" if @type == "moon"
-            #@patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{cotter_filename}").match(/Submitted batch job (\d+)/)[1].to_i
-            #cotter_filename = "q_cotter_off_moon_0.sh" if @type == "moon"
-            #@patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{cotter_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type == "moon"
+            cotter_filename = "q_cotter_moon_0.sh" unless @type == "moon"
+            cotter_filename = "q_cotter_on_moon_0.sh" if @type == "moon"
+            @on_moon_cotter_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{cotter_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+            cotter_filename = "q_cotter_off_moon_0.sh" if @type == "moon"
+            @off_moon_cotter_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{cotter_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type == "moon"
             if @type == "moon"
                ##do all this downloading stuff separately...
                #p manta_ray_filename = "q_manta_ray_on_moon_0.sh"
@@ -907,9 +907,9 @@ srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_0.in
                #   #sleep(1) until outfiles_exist
                #end
                p selfcal_filename_on_moon = "q_selfcal_on_moon.sh"
-               p @patch_jobid_on_moon = sbatch("--dependency=afterok:#{@setup_jobid} #{selfcal_filename_on_moon}").match(/Submitted batch job (\d+)/)[1].to_i
+               p @patch_jobid_on_moon = sbatch("--dependency=afterok:#{@on_moon_cotter_jobid} #{selfcal_filename_on_moon}").match(/Submitted batch job (\d+)/)[1].to_i
                p selfcal_filename_off_moon = "q_selfcal_off_moon.sh"
-               p @patch_jobid_off_moon = sbatch("--dependency=afterok:#{@setup_jobid} #{selfcal_filename_off_moon}").match(/Submitted batch job (\d+)/)[1].to_i
+               p @patch_jobid_off_moon = sbatch("--dependency=afterok:#{@off_moon_cotter_jobid} #{selfcal_filename_off_moon}").match(/Submitted batch job (\d+)/)[1].to_i
                #ionpeel_filename = "q_ionpeel_on_moon.sh"
                #ionpeel_filename = "q_ionpeel_off_moon.sh" if @type == "moon" 
                #@patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{ionpeel_filename}").match(/Submitted batch job (\d+)/)[1].to_i 
