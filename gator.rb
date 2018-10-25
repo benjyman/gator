@@ -548,8 +548,8 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
             puts "observing semester %s not known" % obs_semester
         end
         contents = generate_slurm_header(job_name: "se_#{@obsid}",
-                                         machine: "galaxy",
-                                         partition: "gpuq",
+                                         machine: "magnus",
+                                         partition: "workq",
                                          mins: mins,
                                          nodes: 1,
                                          output: "RTS-setup-#{@obsid}-%A.out")
@@ -858,8 +858,8 @@ sed -i \"s|\\(ChannelBandwidth=\\).*|\\1#{@channel_bandwidth}|\" #{ENV["USER"]}_
 
             filename = "rts_patch.sh"
             contents = generate_slurm_header(job_name: "pa_#{@obsid}",
-                                             machine: "galaxy",
-                                             partition: "gpuq",
+                                             machine: "magnus",
+                                             partition: "workq",
                                              mins: mins,
                                              nodes: num_nodes,
                                              output: "RTS-patch-#{@obsid}-%A.out")
@@ -971,8 +971,8 @@ srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_0.in
 
         filename = "rts_peel.sh"
         contents = generate_slurm_header(job_name: "pe_#{@obsid}",
-                                         machine: "galaxy",
-                                         partition: "gpuq",
+                                         machine: "magnus",
+                                         partition: "workq",
                                          mins: mins,
                                          nodes: num_nodes,
                                          output: "RTS-peel-#{@obsid}-%A.out")
