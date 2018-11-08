@@ -56,11 +56,13 @@ end
 
 def sbatch(command)
     output = `sbatch #{command} 2>&1`
+    puts "sbatch #{command} 2>&1" 
     # Sometimes the queue system needs a little time to think.
     while output =~ /error/
         STDERR.puts "Slurm error, waiting 10s"
         sleep 10
         output = `sbatch #{command} 2>&1`
+        
     end
     return output
 end
@@ -838,6 +840,7 @@ sed -i \"s|\\(ChannelBandwidth=\\).*|\\1#{@channel_bandwidth}|\" #{ENV["USER"]}_
         write(file: "obsid.dat", contents: @obsid)
         write(file: "rts_setup.sh", contents: contents)
         @setup_jobid = sbatch("rts_setup.sh").match(/Submitted batch job (\d+)/)[1].to_i
+        puts "setup jobid is #{@setup_jobid}"
     end
 
     def ms_download()
@@ -884,11 +887,12 @@ srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_0.in
             @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{filename}").match(/Submitted batch job (\d+)/)[1].to_i
         else
             Dir.chdir "#{@path}/#{@timestamp_dir}" unless Dir.pwd == "#{@path}/#{@timestamp_dir}"
-            cotter_filename = "q_cotter_moon_0.sh" unless @type == "moon"
-            cotter_filename = "q_cotter_on_moon_0.sh" if @type == "moon"
-            @on_moon_cotter_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{cotter_filename}").match(/Submitted batch job (\d+)/)[1].to_i
-            cotter_filename = "q_cotter_off_moon_0.sh" if @type == "moon"
-            @off_moon_cotter_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{cotter_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type == "moon"
+            #########askip the cotter stuff for now, experimenting with cleaning already cottered obs e.g. 2015B_05
+            #cotter_filename = "q_cotter_moon_0.sh" unless @type == "moon"
+            #cotter_filename = "q_cotter_on_moon_0.sh" if @type == "moon"
+            #@on_moon_cotter_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{cotter_filename}").match(/Submitted batch job (\d+)/)[1].to_i
+            #cotter_filename = "q_cotter_off_moon_0.sh" if @type == "moon"
+            #@off_moon_cotter_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{cotter_filename}").match(/Submitted batch job (\d+)/)[1].to_i if @type == "moon"
             if @type == "moon"
                ##do all this downloading stuff separately...
                #p manta_ray_filename = "q_manta_ray_on_moon_0.sh"
@@ -921,6 +925,7 @@ srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_0.in
                #@patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{ionpeel_filename}").match(/Submitted batch job (\d+)/)[1].to_i 
                p image_filename_on_moon = "q_image_on_moon.sh"
                p @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{image_filename_on_moon}").match(/Submitted batch job (\d+)/)[1].to_i
+               puts "--dependency=afterok:#{@setup_jobid} #{image_filename_on_moon}" 
                ##########
                ##Commenting this out to test cleaning on moon images (run on 2015B_05 on moon only)
                ##p image_filename_off_moon = "q_image_off_moon.sh"
