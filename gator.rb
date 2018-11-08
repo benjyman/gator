@@ -527,8 +527,10 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
             time_averaging='8'
             freq_averaging='80'
             imsize_string='--imsize=2048'
-            if @type == "moon" 
-                wsclean_options_string='--wsclean_options=" -niter 0 -datacolumn CORRECTED_DATA  -scale 0.0085 -weight uniform  -smallinversion  -channelsout 24 -make-psf  "'
+            if @type == "moon"
+                #try out cleaning on moon images 
+                #wsclean_options_string='--wsclean_options=" -niter 0 -datacolumn CORRECTED_DATA  -scale 0.0085 -weight uniform  -smallinversion  -channelsout 24 -make-psf  "'
+                wsclean_options_string='--wsclean_options=" -auto-threshold 1 -auto-mask 3 -multiscale -niter 1000000 -mgain 0.85 -save-source-list -datacolumn CORRECTED_DATA  -scale 0.0085 -weight uniform  -smallinversion  -channelsout 24 -make-psf "'
             else
                 wsclean_options_string='--wsclean_options=" -niter 2000 -threshold 1.5 -multiscale -mgain 0.85 -joinpolarizations -datacolumn CORRECTED_DATA  -scale 0.0085 -weight briggs 0  -smallinversion  -channelsout 1 -make-psf  "'
             end
@@ -906,17 +908,24 @@ srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_0.in
                #   downloads_complete = (File.readlines(manta_ray_outfile_on_moon).grep(/mwa_client finished successfully/).any? and File.readlines(manta_ray_outfile_off_moon).grep(/mwa_client finished successfully/).any?)
                #   #sleep(1) until outfiles_exist
                #end
-               p selfcal_filename_on_moon = "q_selfcal_on_moon.sh"
-               p @patch_jobid_on_moon = sbatch("--dependency=afterok:#{@on_moon_cotter_jobid} #{selfcal_filename_on_moon}").match(/Submitted batch job (\d+)/)[1].to_i
-               p selfcal_filename_off_moon = "q_selfcal_off_moon.sh"
-               p @patch_jobid_off_moon = sbatch("--dependency=afterok:#{@off_moon_cotter_jobid} #{selfcal_filename_off_moon}").match(/Submitted batch job (\d+)/)[1].to_i
+               ##########
+               ##Commenting this out to test cleaning on moon images (run on 2015B_05, which has already been calibrated
+               ##p selfcal_filename_on_moon = "q_selfcal_on_moon.sh"
+               ##p @patch_jobid_on_moon = sbatch("--dependency=afterok:#{@on_moon_cotter_jobid} #{selfcal_filename_on_moon}").match(/Submitted batch job (\d+)/)[1].to_i
+               ##p selfcal_filename_off_moon = "q_selfcal_off_moon.sh"
+               ##p @patch_jobid_off_moon = sbatch("--dependency=afterok:#{@off_moon_cotter_jobid} #{selfcal_filename_off_moon}").match(/Submitted batch job (\d+)/)[1].to_i
+               ########## 
+
                #ionpeel_filename = "q_ionpeel_on_moon.sh"
                #ionpeel_filename = "q_ionpeel_off_moon.sh" if @type == "moon" 
                #@patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{ionpeel_filename}").match(/Submitted batch job (\d+)/)[1].to_i 
                p image_filename_on_moon = "q_image_on_moon.sh"
                p @patch_jobid_on_moon = sbatch("--dependency=afterok:#{@patch_jobid_on_moon} #{image_filename_on_moon}").match(/Submitted batch job (\d+)/)[1].to_i
-               p image_filename_off_moon = "q_image_off_moon.sh"
-               p @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid_off_moon} #{image_filename_off_moon}").match(/Submitted batch job (\d+)/)[1].to_i
+               ##########
+               ##Commenting this out to test cleaning on moon images (run on 2015B_05 on moon only)
+               ##p image_filename_off_moon = "q_image_off_moon.sh"
+               ##p @patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid_off_moon} #{image_filename_off_moon}").match(/Submitted batch job (\d+)/)[1].to_i
+               ##########
                #don't need pbcorr step now - just make stokes I with wsclean!
                #p pbcorr_filename_on_moon = "q_pbcorr_on_moon.sh"
                #p @patch_jobid_on_moon = sbatch("--dependency=afterok:#{@patch_jobid_on_moon} #{pbcorr_filename_on_moon}").match(/Submitted batch job (\d+)/)[1].to_i
