@@ -920,7 +920,7 @@ srun -n #{num_nodes} #{@rts_path} #{ENV["USER"]}_rts_0.in
                #ionpeel_filename = "q_ionpeel_off_moon.sh" if @type == "moon" 
                #@patch_jobid = sbatch("--dependency=afterok:#{@patch_jobid} #{ionpeel_filename}").match(/Submitted batch job (\d+)/)[1].to_i 
                p image_filename_on_moon = "q_image_on_moon.sh"
-               p @patch_jobid_on_moon = sbatch("--dependency=afterok:#{@setup_jobid} #{image_filename_on_moon}").match(/Submitted batch job (\d+)/)[1].to_i
+               p @patch_jobid = sbatch("--dependency=afterok:#{@setup_jobid} #{image_filename_on_moon}").match(/Submitted batch job (\d+)/)[1].to_i
                ##########
                ##Commenting this out to test cleaning on moon images (run on 2015B_05 on moon only)
                ##p image_filename_off_moon = "q_image_off_moon.sh"
