@@ -530,7 +530,7 @@ obsdownload.py -o #{@obsid} --chstart=1 --chcount=24 -f -m
             if @type == "moon"
                 #try out cleaning on moon images 
                 #wsclean_options_string='--wsclean_options=" -niter 0 -datacolumn CORRECTED_DATA  -scale 0.0085 -weight uniform  -smallinversion  -channelsout 24 -make-psf  "'
-                wsclean_options_string='--wsclean_options=" -auto-threshold 1 -auto-mask 3 -multiscale -niter 1000000 -mgain 0.85 -save-source-list -datacolumn CORRECTED_DATA  -scale 0.0085 -weight uniform  -smallinversion  -channelsout 24 -make-psf "'
+                wsclean_options_string='--wsclean_options=" -auto-threshold 1 -auto-mask 3 -multiscale -niter 1000000 -mgain 0.85 -save-source-list -datacolumn CORRECTED_DATA  -scale 0.0085 -weight uniform  -smallinversion  -channelsout 24 -join-channels -fit-spectral-pol 2 -make-psf -mwa-path /group/mwa/software/mwapy/master/galaxy/lib/python2.7/site-packages/mwapy/data/mwa_full_embedded_element_pattern.h5  "'
             else
                 wsclean_options_string='--wsclean_options=" -niter 2000 -threshold 1.5 -multiscale -mgain 0.85 -joinpolarizations -datacolumn CORRECTED_DATA  -scale 0.0085 -weight briggs 0  -smallinversion  -channelsout 1 -make-psf  "'
             end
